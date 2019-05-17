@@ -1,0 +1,27 @@
+apiVersion: stream.projectriff.io/v1alpha1
+kind: Stream
+metadata:
+  name: numbers
+spec:
+  provider: kafka-provider
+---
+apiVersion: stream.projectriff.io/v1alpha1
+kind: Stream
+metadata:
+  name: repeated
+spec:
+  provider: kafka-provider
+---
+apiVersion: stream.projectriff.io/v1alpha1
+kind: Stream
+metadata:
+  name: words
+spec:
+  provider: kafka-provider
+---
+apiVersion: stream.projectriff.io/v1alpha1
+kind: Stream
+metadata:
+  name: averages
+spec:
+  provider: kafka-provider

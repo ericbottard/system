@@ -54,7 +54,8 @@ func MakeDeployment(proc *streamv1alpha1.Processor) (*appsv1.Deployment, error) 
 					Containers: []corev1.Container{
 						corev1.Container{
 							Name:  "processor",
-							Image: "ericbottard/processor:grpc-be83df8",
+							Image: "ericbottard/processor:grpc",
+							ImagePullPolicy: corev1.PullAlways,
 							Env: []corev1.EnvVar{
 								{
 									Name:  "INPUTS",

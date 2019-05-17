@@ -1,0 +1,12 @@
+apiVersion: build.projectriff.io/v1alpha1
+kind: Function
+metadata:
+  name: repeater
+spec:
+  cacheSize: 8Gi
+  handler: com.acme.Repeater
+  image: gcr.io/cf-spring-funkytown/repeater
+  source:
+    git:
+      revision: master
+      url: https://github.com/ericbottard/repeater

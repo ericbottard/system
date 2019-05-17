@@ -1,0 +1,12 @@
+apiVersion: stream.projectriff.io/v1alpha1
+kind: StreamProcessor
+metadata:
+  name: repeater
+spec:
+  function: gcr.io/cf-spring-funkytown/repeater
+  inputs:
+  - words
+  - numbers
+  outputs:
+  - repeated
+  - averages
