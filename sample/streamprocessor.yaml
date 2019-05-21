@@ -1,5 +1,5 @@
 apiVersion: stream.projectriff.io/v1alpha1
-kind: StreamProcessor
+kind: Processor
 metadata:
   name: repeater
 spec:
@@ -9,4 +9,4 @@ spec:
   - numbers
   outputs:
   - repeated
-  - averages
+  - sums

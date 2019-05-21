@@ -22,6 +22,6 @@ spec:
 apiVersion: stream.projectriff.io/v1alpha1
 kind: Stream
 metadata:
-  name: averages
+  name: sums
 spec:
   provider: kafka-provider
