@@ -71,7 +71,7 @@ func MakeDeployment(proc *streamv1alpha1.Processor) (*appsv1.Deployment, error) 
 								},
 								{
 									Name:  "FUNCTION",
-									Value: "localhost:8080",
+									Value: "localhost:8081",
 								},
 							},
 						},
@@ -80,7 +80,7 @@ func MakeDeployment(proc *streamv1alpha1.Processor) (*appsv1.Deployment, error) 
 							Image: proc.Status.FunctionImage,
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: 8080,
+									ContainerPort: 8081,
 								},
 							},
 						},
