@@ -19,9 +19,13 @@ package streamingprocessor
 import (
 	"context"
 	"fmt"
+	kedav1alpha1 "github.com/kedacore/keda/pkg/apis/keda/v1alpha1"
+	"github.com/kedacore/keda/pkg/client/informers/externalversions/keda/v1alpha1"
 	"reflect"
 	"time"
 
+	kedaclientset "github.com/kedacore/keda/pkg/client/clientset/versioned"
+	scaledobjectlisters "github.com/kedacore/keda/pkg/client/listers/keda/v1alpha1"
 	"github.com/knative/pkg/controller"
 	"github.com/knative/pkg/kmp"
 	"github.com/knative/pkg/logging"
@@ -57,11 +61,14 @@ const (
 type Reconciler struct {
 	*reconciler.Base
 
+	kedaClientSet kedaclientset.Interface
+
 	// listers index properties about resources
-	processorLister  streaminglisters.ProcessorLister
-	functionLister   buildlisters.FunctionLister
-	streamLister     streaminglisters.StreamLister
-	deploymentLister appslisters.DeploymentLister
+	processorLister    streaminglisters.ProcessorLister
+	functionLister     buildlisters.FunctionLister
+	streamLister       streaminglisters.StreamLister
+	deploymentLister   appslisters.DeploymentLister
+	scaledObjectLister scaledobjectlisters.ScaledObjectLister
 
 	tracker tracker.Interface
 }
@@ -77,6 +84,8 @@ func NewController(
 	functionInformer buildinformers.FunctionInformer,
 	streamingInformer streaminformers.StreamInformer,
 	deploymentInformer appsinformers.DeploymentInformer,
+	scaledObjectInformer v1alpha1.ScaledObjectInformer,
+	kedaClientSet kedaclientset.Interface,
 ) *controller.Impl {
 
 	c := &Reconciler{
@@ -85,6 +94,8 @@ func NewController(
 		functionLister:   functionInformer.Lister(),
 		streamLister:     streamingInformer.Lister(),
 		deploymentLister: deploymentInformer.Lister(),
+		scaledObjectLister: scaledObjectInformer.Lister(),
+		kedaClientSet:    kedaClientSet,
 	}
 	impl := controller.NewImpl(c, c.Logger, ReconcilerName)
 
@@ -245,7 +256,7 @@ func (c *Reconciler) reconcile(ctx context.Context, processor *streamingv1alpha1
 		logger.Errorf("Failed to reconcile Processor: %q failed to Get Deployment: %q; %v", processor.Name, deploymentName, zap.Error(err))
 		return err
 	} else if !metav1.IsControlledBy(deployment, processor) {
-		// Surface an error in the processor's status,and return an error.
+		// Surface an error in the processor's status, and return an error.
 		processor.Status.MarkDeploymentNotOwned(deploymentName)
 		return fmt.Errorf("Processor: %q does not own Deployment: %q", processor.Name, deploymentName)
 	} else {
@@ -262,6 +273,38 @@ func (c *Reconciler) reconcile(ctx context.Context, processor *streamingv1alpha1
 	// Update our Status based on the state of our underlying Deployment.
 	processor.Status.DeploymentName = deployment.Name
 	processor.Status.PropagateDeploymentStatus(&deployment.Status)
+
+	scaledObjectName := resourcenames.ScaledObject(processor)
+	scaledObject, err := c.scaledObjectLister.ScaledObjects(processor.Namespace).Get(scaledObjectName)
+	if errors.IsNotFound(err) {
+		scaledObject, err = c.createScaledObject(processor, deployment)
+		if err != nil {
+			logger.Errorf("Failed to create ScaledObject %q: %v", scaledObjectName, err)
+			c.Recorder.Eventf(processor, corev1.EventTypeWarning, "CreationFailed", "Failed to create ScaledObject %q: %v", scaledObjectName, err)
+			return err
+		}
+		if scaledObject != nil {
+			c.Recorder.Eventf(processor, corev1.EventTypeNormal, "Created", "Created ScaledObject %q", scaledObjectName)
+		}
+	} else if err != nil {
+		logger.Errorf("Failed to reconcile Processor: %q failed to Get ScaledObject: %q; %v", processor.Name, scaledObjectName, zap.Error(err))
+		return err
+	} else if !metav1.IsControlledBy(scaledObject, processor) {
+		// Surface an error in the processor's status, and return an error.
+		processor.Status.MarkScaledObjectNotOwned(scaledObjectName)
+		return fmt.Errorf("Processor: %q does not own ScaledObject: %q", processor.Name, scaledObjectName)
+	} else {
+		scaledObject, err = c.reconcileScaledObject(ctx, processor, deployment, scaledObject)
+		if err != nil {
+			logger.Errorf("Failed to reconcile Processor: %q failed to reconcile ScaledObject: %q; %v", processor.Name, scaledObject, zap.Error(err))
+			return err
+		}
+		if scaledObject == nil {
+			c.Recorder.Eventf(processor, corev1.EventTypeNormal, "Deleted", "Deleted ScaledObject %q", scaledObjectName)
+		}
+	}
+
+	processor.Status.PropagateScaledObjectStatus(&scaledObject.Status)
 
 	processor.Status.ObservedGeneration = processor.Generation
 
@@ -330,8 +373,50 @@ func (c *Reconciler) createDeployment(processor *streamingv1alpha1.Processor) (*
 	}
 	return c.KubeClientSet.AppsV1().Deployments(processor.Namespace).Create(deployment)
 }
-
 func deploymentSemanticEquals(desiredDeployment, deployment *appsv1.Deployment) bool {
 	return equality.Semantic.DeepEqual(desiredDeployment.Spec, deployment.Spec) &&
 		equality.Semantic.DeepEqual(desiredDeployment.ObjectMeta.Labels, deployment.ObjectMeta.Labels)
+}
+
+func scaledObjectSemanticEquals(desiredScaledObject, scaledObject *kedav1alpha1.ScaledObject) bool {
+	return equality.Semantic.DeepEqual(desiredScaledObject.Spec, scaledObject.Spec) &&
+		equality.Semantic.DeepEqual(desiredScaledObject.ObjectMeta.Labels, scaledObject.ObjectMeta.Labels)
+}
+
+func (c *Reconciler) createScaledObject(processor *streamingv1alpha1.Processor, deployment *appsv1.Deployment) (*kedav1alpha1.ScaledObject, error) {
+	scaledObject, err := resources.MakeScaledObject(processor, deployment)
+	if err != nil {
+		return nil, err
+	}
+	if scaledObject == nil {
+		// nothing to create
+		return scaledObject, nil
+	}
+	return c.kedaClientSet.KedaV1alpha1().ScaledObjects(processor.Namespace).Create(scaledObject)
+
+}
+
+func (c *Reconciler) reconcileScaledObject(ctx context.Context, processor *streamingv1alpha1.Processor, deployment *appsv1.Deployment, scaledObject *kedav1alpha1.ScaledObject) (*kedav1alpha1.ScaledObject, error) {
+	logger := logging.FromContext(ctx)
+	desiredScaledObject, err := resources.MakeScaledObject(processor, deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	if scaledObjectSemanticEquals(desiredScaledObject, scaledObject) {
+		// No differences to reconcile.
+		return scaledObject, nil
+	}
+	diff, err := kmp.SafeDiff(desiredScaledObject.Spec, deployment.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to diff ScaledObject: %v", err)
+	}
+	logger.Infof("Reconciling scaledObject diff (-desired, +observed): %s", diff)
+
+	// Don't modify the informers copy.
+	existing := scaledObject.DeepCopy()
+	// Preserve the rest of the object (e.g. ObjectMeta except for labels).
+	existing.Spec = desiredScaledObject.Spec
+	existing.ObjectMeta.Labels = desiredScaledObject.ObjectMeta.Labels
+	return existing, nil
 }

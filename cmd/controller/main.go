@@ -33,9 +33,11 @@ import (
 	"github.com/knative/pkg/system"
 	"github.com/knative/pkg/version"
 	knservingclientset "github.com/knative/serving/pkg/client/clientset/versioned"
+	kedaclientset "github.com/kedacore/keda/pkg/client/clientset/versioned"
 	knservinginformers "github.com/knative/serving/pkg/client/informers/externalversions"
 	projectriffclientset "github.com/projectriff/system/pkg/client/clientset/versioned"
 	projectriffinformers "github.com/projectriff/system/pkg/client/informers/externalversions"
+	kedainformers "github.com/kedacore/keda/pkg/client/informers/externalversions"
 	"github.com/projectriff/system/pkg/logging"
 	"github.com/projectriff/system/pkg/metrics"
 	"github.com/projectriff/system/pkg/reconciler"
@@ -116,6 +118,11 @@ func main() {
 		logger.Fatalw("Error building knserving clientset", zap.Error(err))
 	}
 
+	kedaClient, err := kedaclientset.NewForConfig(cfg)
+	if err != nil {
+		logger.Fatalw("Error building keda clientset", zap.Error(err))
+	}
+
 	if err := version.CheckMinimumVersion(kubeClient.Discovery()); err != nil {
 		logger.Fatalf("Version check failed: %v", err)
 	}
@@ -140,10 +147,12 @@ func main() {
 		StopChannel:          stopCh,
 	}
 
+
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, opt.ResyncPeriod)
 	projectriffInformerFactory := projectriffinformers.NewSharedInformerFactory(projectriffClient, opt.ResyncPeriod)
 	knbuildInformerFactory := knbuildinformers.NewSharedInformerFactory(knbuildClient, opt.ResyncPeriod)
 	knservingInformerFactory := knservinginformers.NewSharedInformerFactory(knservingClient, opt.ResyncPeriod)
+	kedaInformerFactory := kedainformers.NewSharedInformerFactory(kedaClient, opt.ResyncPeriod)
 
 	applicationInformer := projectriffInformerFactory.Build().V1alpha1().Applications()
 	containerInformer := projectriffInformerFactory.Build().V1alpha1().Containers()
@@ -165,6 +174,7 @@ func main() {
 	knserviceInformer := knservingInformerFactory.Serving().V1alpha1().Services()
 	knconfigurationInformer := knservingInformerFactory.Serving().V1alpha1().Configurations()
 	knrouteInformer := knservingInformerFactory.Serving().V1alpha1().Routes()
+	scaledObjectInformer := kedaInformerFactory.Keda().V1alpha1().ScaledObjects()
 
 	// Build all of our controllers, with the clients constructed above.
 	// Add new controllers to this array.
@@ -229,6 +239,8 @@ func main() {
 			functionInformer,
 			streamInformer,
 			deploymentInformer,
+			scaledObjectInformer,
+			kedaClient,
 		),
 	}
 	if knativeRuntime {
