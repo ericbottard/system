@@ -278,6 +278,7 @@ func main() {
 	kubeInformerFactory.Start(stopCh)
 	projectriffInformerFactory.Start(stopCh)
 	knbuildInformerFactory.Start(stopCh)
+	kedaInformerFactory.Start(stopCh)
 	if knativeRuntime {
 		knservingInformerFactory.Start(stopCh)
 	}
@@ -300,6 +301,7 @@ func main() {
 		secretInformer.Informer().HasSynced,
 		serviceaccountInformer.Informer().HasSynced,
 		knbuildInformer.Informer().HasSynced,
+		scaledObjectInformer.Informer().HasSynced,
 	}
 	if knativeRuntime {
 		informersSynced = append(informersSynced,

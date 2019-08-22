@@ -1257,6 +1257,7 @@
     "github.com/kedacore/keda/pkg/apis/keda/v1alpha1",
     "github.com/kedacore/keda/pkg/client/clientset/versioned",
     "github.com/kedacore/keda/pkg/client/informers/externalversions",
+    "github.com/kedacore/keda/pkg/client/informers/externalversions/keda/v1alpha1",
     "github.com/kedacore/keda/pkg/client/listers/keda/v1alpha1",
     "github.com/knative/build/pkg/apis/build/v1alpha1",
     "github.com/knative/build/pkg/client/clientset/versioned",
