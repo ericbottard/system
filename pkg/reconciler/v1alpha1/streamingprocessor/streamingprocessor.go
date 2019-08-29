@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"time"
 
-	kedaclientset "github.com/kedacore/keda/pkg/client/clientset/versioned"
 	scaledobjectlisters "github.com/kedacore/keda/pkg/client/listers/keda/v1alpha1"
 	"github.com/knative/pkg/controller"
 	"github.com/knative/pkg/kmp"
@@ -61,8 +60,6 @@ const (
 type Reconciler struct {
 	*reconciler.Base
 
-	kedaClientSet kedaclientset.Interface
-
 	// listers index properties about resources
 	processorLister    streaminglisters.ProcessorLister
 	functionLister     buildlisters.FunctionLister
@@ -85,7 +82,6 @@ func NewController(
 	streamingInformer streaminformers.StreamInformer,
 	deploymentInformer appsinformers.DeploymentInformer,
 	scaledObjectInformer v1alpha1.ScaledObjectInformer,
-	kedaClientSet kedaclientset.Interface,
 ) *controller.Impl {
 
 	c := &Reconciler{
@@ -95,7 +91,6 @@ func NewController(
 		streamLister:     streamingInformer.Lister(),
 		deploymentLister: deploymentInformer.Lister(),
 		scaledObjectLister: scaledObjectInformer.Lister(),
-		kedaClientSet:    kedaClientSet,
 	}
 	impl := controller.NewImpl(c, c.Logger, ReconcilerName)
 
@@ -392,7 +387,7 @@ func (c *Reconciler) createScaledObject(processor *streamingv1alpha1.Processor, 
 		// nothing to create
 		return scaledObject, nil
 	}
-	return c.kedaClientSet.KedaV1alpha1().ScaledObjects(processor.Namespace).Create(scaledObject)
+	return c.KedaClientSet.KedaV1alpha1().ScaledObjects(processor.Namespace).Create(scaledObject)
 
 }
 

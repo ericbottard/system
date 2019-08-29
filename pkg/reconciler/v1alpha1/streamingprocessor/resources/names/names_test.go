@@ -42,7 +42,7 @@ func TestNamer(t *testing.T) {
 		want: "foo-processor",
 	}, {
 		name: "Deployment",
-		proc: &streamv1alpha1.Processor{
+		proc: &streamingv1alpha1.Processor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
 				Namespace: "default",

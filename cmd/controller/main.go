@@ -149,10 +149,12 @@ func main() {
 		ProjectriffClientSet: projectriffClient,
 		KnBuildClientSet:     knbuildClient,
 		KnServingClientSet:   knservingClient,
-		ConfigMapWatcher:     configMapWatcher,
-		Logger:               logger,
-		ResyncPeriod:         10 * time.Hour, // Based on controller-runtime default.
-		StopChannel:          stopCh,
+		KedaClientSet:        kedaClient,
+
+		ConfigMapWatcher: configMapWatcher,
+		Logger:           logger,
+		ResyncPeriod:     10 * time.Hour, // Based on controller-runtime default.
+		StopChannel:      stopCh,
 	}
 
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, opt.ResyncPeriod)
@@ -275,7 +277,6 @@ func main() {
 				streamInformer,
 				deploymentInformer,
 				scaledObjectInformer,
-				kedaClient,
 			),
 		)
 	}
