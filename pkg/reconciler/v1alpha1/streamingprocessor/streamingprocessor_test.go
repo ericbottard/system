@@ -19,16 +19,16 @@ package streamingprocessor
 import (
 	"testing"
 
+	fakekedaclientset "github.com/kedacore/keda/pkg/client/clientset/versioned/fake"
+	kedainformers "github.com/kedacore/keda/pkg/client/informers/externalversions"
 	"github.com/knative/pkg/controller"
 	fakeprojectriffclientset "github.com/projectriff/system/pkg/client/clientset/versioned/fake"
 	projectriffinformers "github.com/projectriff/system/pkg/client/informers/externalversions"
-	kedainformers "github.com/kedacore/keda/pkg/client/informers/externalversions"
 	"github.com/projectriff/system/pkg/reconciler"
 	rtesting "github.com/projectriff/system/pkg/reconciler/testing"
 	. "github.com/projectriff/system/pkg/reconciler/v1alpha1/testing"
 	kubeinformers "k8s.io/client-go/informers"
 	fakekubeclientset "k8s.io/client-go/kubernetes/fake"
-	fakekedaclientset "github.com/kedacore/keda/pkg/client/clientset/versioned/fake"
 )
 
 func TestReconcile(t *testing.T) {
@@ -45,8 +45,10 @@ func TestReconcile(t *testing.T) {
 		return &Reconciler{
 			Base:             reconciler.NewBase(opt, controllerAgentName),
 			processorLister:  listers.GetStreamingProcessorLister(),
+			functionLister:   listers.GetFunctionLister(),
 			streamLister:     listers.GetStreamingStreamLister(),
 			deploymentLister: listers.GetDeploymentLister(),
+			scaledObjectLister:listers.GetScaledObjectLister(),
 
 			tracker: &rtesting.NullTracker{},
 		}
@@ -71,7 +73,7 @@ func TestNew(t *testing.T) {
 	c := NewController(reconciler.Options{
 		KubeClientSet:        kubeClient,
 		ProjectriffClientSet: projectriffClient,
-		KedaClientSet: kedaClient,
+		KedaClientSet:        kedaClient,
 		Logger:               TestLogger(t),
 	}, processorInformer, functionInformer, streamInformer, deploymentInformer, scaledObjectInformer)
 
