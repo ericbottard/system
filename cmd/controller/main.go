@@ -18,8 +18,6 @@ package main
 
 import (
 	"flag"
-	"github.com/projectriff/system/pkg/reconciler/v1alpha1/streamingprocessor"
-	"github.com/projectriff/system/pkg/reconciler/v1alpha1/streamingstream"
 	"log"
 	"time"
 
@@ -51,6 +49,8 @@ import (
 	"github.com/projectriff/system/pkg/reconciler/v1alpha1/function"
 	"github.com/projectriff/system/pkg/reconciler/v1alpha1/knativeadapter"
 	"github.com/projectriff/system/pkg/reconciler/v1alpha1/knativedeployer"
+	"github.com/projectriff/system/pkg/reconciler/v1alpha1/streamingprocessor"
+	"github.com/projectriff/system/pkg/reconciler/v1alpha1/streamingstream"
 	"go.uber.org/zap"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

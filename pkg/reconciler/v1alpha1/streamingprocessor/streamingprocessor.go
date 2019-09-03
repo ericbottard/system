@@ -19,8 +19,6 @@ package streamingprocessor
 import (
 	"context"
 	"fmt"
-	kedav1alpha1 "github.com/kedacore/keda/pkg/apis/keda/v1alpha1"
-	"github.com/kedacore/keda/pkg/client/informers/externalversions/keda/v1alpha1"
 	"reflect"
 	"time"
 
@@ -31,8 +29,10 @@ import (
 	"github.com/knative/pkg/tracker"
 	buildv1alpha1 "github.com/projectriff/system/pkg/apis/build/v1alpha1"
 	streamingv1alpha1 "github.com/projectriff/system/pkg/apis/streaming/v1alpha1"
+	kedav1alpha1 "github.com/kedacore/keda/pkg/apis/keda/v1alpha1"
 	buildinformers "github.com/projectriff/system/pkg/client/informers/externalversions/build/v1alpha1"
 	streaminformers "github.com/projectriff/system/pkg/client/informers/externalversions/streaming/v1alpha1"
+	kedainformers "github.com/kedacore/keda/pkg/client/informers/externalversions/keda/v1alpha1"
 	buildlisters "github.com/projectriff/system/pkg/client/listers/build/v1alpha1"
 	streaminglisters "github.com/projectriff/system/pkg/client/listers/streaming/v1alpha1"
 	"github.com/projectriff/system/pkg/reconciler"
@@ -81,7 +81,7 @@ func NewController(
 	functionInformer buildinformers.FunctionInformer,
 	streamingInformer streaminformers.StreamInformer,
 	deploymentInformer appsinformers.DeploymentInformer,
-	scaledObjectInformer v1alpha1.ScaledObjectInformer,
+	scaledObjectInformer kedainformers.ScaledObjectInformer,
 ) *controller.Impl {
 
 	c := &Reconciler{
@@ -368,6 +368,7 @@ func (c *Reconciler) createDeployment(processor *streamingv1alpha1.Processor) (*
 	}
 	return c.KubeClientSet.AppsV1().Deployments(processor.Namespace).Create(deployment)
 }
+
 func deploymentSemanticEquals(desiredDeployment, deployment *appsv1.Deployment) bool {
 	return equality.Semantic.DeepEqual(desiredDeployment.Spec, deployment.Spec) &&
 		equality.Semantic.DeepEqual(desiredDeployment.ObjectMeta.Labels, deployment.ObjectMeta.Labels)
@@ -376,19 +377,6 @@ func deploymentSemanticEquals(desiredDeployment, deployment *appsv1.Deployment) 
 func scaledObjectSemanticEquals(desiredScaledObject, scaledObject *kedav1alpha1.ScaledObject) bool {
 	return equality.Semantic.DeepEqual(desiredScaledObject.Spec, scaledObject.Spec) &&
 		equality.Semantic.DeepEqual(desiredScaledObject.ObjectMeta.Labels, scaledObject.ObjectMeta.Labels)
-}
-
-func (c *Reconciler) createScaledObject(processor *streamingv1alpha1.Processor, deployment *appsv1.Deployment) (*kedav1alpha1.ScaledObject, error) {
-	scaledObject, err := resources.MakeScaledObject(processor, deployment)
-	if err != nil {
-		return nil, err
-	}
-	if scaledObject == nil {
-		// nothing to create
-		return scaledObject, nil
-	}
-	return c.KedaClientSet.KedaV1alpha1().ScaledObjects(processor.Namespace).Create(scaledObject)
-
 }
 
 func (c *Reconciler) reconcileScaledObject(ctx context.Context, processor *streamingv1alpha1.Processor, deployment *appsv1.Deployment, scaledObject *kedav1alpha1.ScaledObject) (*kedav1alpha1.ScaledObject, error) {
@@ -414,4 +402,16 @@ func (c *Reconciler) reconcileScaledObject(ctx context.Context, processor *strea
 	existing.Spec = desiredScaledObject.Spec
 	existing.ObjectMeta.Labels = desiredScaledObject.ObjectMeta.Labels
 	return existing, nil
+}
+
+func (c *Reconciler) createScaledObject(processor *streamingv1alpha1.Processor, deployment *appsv1.Deployment) (*kedav1alpha1.ScaledObject, error) {
+	scaledObject, err := resources.MakeScaledObject(processor, deployment)
+	if err != nil {
+		return nil, err
+	}
+	if scaledObject == nil {
+		// nothing to create
+		return scaledObject, nil
+	}
+	return c.KedaClientSet.KedaV1alpha1().ScaledObjects(processor.Namespace).Create(scaledObject)
 }
