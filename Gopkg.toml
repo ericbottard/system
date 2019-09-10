@@ -81,6 +81,10 @@ required = [
   # Needed to downgrade protobuf to v2
   version = "v0.1.0"
 
+[[override]]
+  name = "github.com/golang/protobuf"
+  version = "v1.3.2"
+
 [prune]
   go-tests = true
   unused-packages = true
