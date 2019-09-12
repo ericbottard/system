@@ -64,6 +64,14 @@ func main() {
 	}
 
 	streamControllerLogger := ctrl.Log.WithName("controllers").WithName("Stream")
+	if err = (&controllers.ProviderReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Provider"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Provider")
+		os.Exit(1)
+	}
 	if err = (&controllers.StreamReconciler{
 		Client:                  mgr.GetClient(),
 		Log:                     streamControllerLogger,
