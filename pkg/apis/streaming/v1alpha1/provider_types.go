@@ -25,8 +25,9 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 var (
-	ProviderLiiklusLabelKey     = GroupVersion.Group + "/provider-liiklus"
-	ProviderProvisionerLabelKey = GroupVersion.Group + "/provider-provisioner"
+	ProviderLabelKey            = GroupVersion.Group + "/provider"             // Identifies all resources originating from a provider
+	ProviderLiiklusLabelKey     = GroupVersion.Group + "/provider-liiklus"     // Used as a selector
+	ProviderProvisionerLabelKey = GroupVersion.Group + "/provider-provisioner" // Used as a selector
 )
 
 // ProviderSpec defines the desired state of Provider

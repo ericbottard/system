@@ -3,8 +3,8 @@
 # It should be run by config/default
 resources:
 - bases/streaming.projectriff.io_streams.yaml
-- bases/streaming.projectriff.io_providers.yaml
 - bases/streaming.projectriff.io_processors.yaml
+- bases/streaming.projectriff.io_providers.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

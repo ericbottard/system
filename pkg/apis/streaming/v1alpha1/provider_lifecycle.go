@@ -1,10 +1,13 @@
 /*
 Copyright 2019 the original author or authors.
- Licensed under the Apache License, Version 2.0 (the "License");
+
+Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-     http://www.apache.org/licenses/LICENSE-2.0
- Unless required by applicable law or agreed to in writing, software
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -34,32 +37,32 @@ var providerCondSet = apis.NewLivingConditionSet(
 	ProviderConditionProvisionerServiceReady,
 )
 
-func (ds *ProviderStatus) GetObservedGeneration() int64 {
-	return ds.ObservedGeneration
+func (ps *ProviderStatus) GetObservedGeneration() int64 {
+	return ps.ObservedGeneration
 }
 
-func (ds *ProviderStatus) IsReady() bool {
-	return providerCondSet.Manage(ds).IsHappy()
+func (ps *ProviderStatus) IsReady() bool {
+	return providerCondSet.Manage(ps).IsHappy()
 }
 
 func (*ProviderStatus) GetReadyConditionType() apis.ConditionType {
 	return ProviderConditionReady
 }
 
-func (ds *ProviderStatus) GetCondition(t apis.ConditionType) *apis.Condition {
-	return providerCondSet.Manage(ds).GetCondition(t)
+func (ps *ProviderStatus) GetCondition(t apis.ConditionType) *apis.Condition {
+	return providerCondSet.Manage(ps).GetCondition(t)
 }
 
-func (ds *ProviderStatus) InitializeConditions() {
-	providerCondSet.Manage(ds).InitializeConditions()
+func (ps *ProviderStatus) InitializeConditions() {
+	providerCondSet.Manage(ps).InitializeConditions()
 }
 
-func (ds *ProviderStatus) MarkLiiklusDeploymentNotOwned() {
-	providerCondSet.Manage(ds).MarkFalse(ProviderConditionLiiklusDeploymentReady, "NotOwned",
-		"There is an existing Deployment %q that we do not own.", ds.LiiklusDeploymentName)
+func (ps *ProviderStatus) MarkLiiklusDeploymentNotOwned() {
+	providerCondSet.Manage(ps).MarkFalse(ProviderConditionLiiklusDeploymentReady, "NotOwned",
+		"There is an existing Deployment %q that we do not own.", ps.LiiklusDeploymentName)
 }
 
-func (ds *ProviderStatus) PropagateLiiklusDeploymentStatus(cds *appsv1.DeploymentStatus) {
+func (ps *ProviderStatus) PropagateLiiklusDeploymentStatus(cds *appsv1.DeploymentStatus) {
 	var available, progressing *appsv1.DeploymentCondition
 	for i := range cds.Conditions {
 		switch cds.Conditions[i].Type {
@@ -74,35 +77,35 @@ func (ds *ProviderStatus) PropagateLiiklusDeploymentStatus(cds *appsv1.Deploymen
 	}
 	if progressing.Status == corev1.ConditionTrue && available.Status == corev1.ConditionFalse {
 		// DeploymentAvailable is False while progressing, avoid reporting ProviderConditionReady as False
-		providerCondSet.Manage(ds).MarkUnknown(ProviderConditionLiiklusDeploymentReady, progressing.Reason, progressing.Message)
+		providerCondSet.Manage(ps).MarkUnknown(ProviderConditionLiiklusDeploymentReady, progressing.Reason, progressing.Message)
 		return
 	}
 	switch {
 	case available.Status == corev1.ConditionUnknown:
-		providerCondSet.Manage(ds).MarkUnknown(ProviderConditionLiiklusDeploymentReady, available.Reason, available.Message)
+		providerCondSet.Manage(ps).MarkUnknown(ProviderConditionLiiklusDeploymentReady, available.Reason, available.Message)
 	case available.Status == corev1.ConditionTrue:
-		providerCondSet.Manage(ds).MarkTrue(ProviderConditionLiiklusDeploymentReady)
+		providerCondSet.Manage(ps).MarkTrue(ProviderConditionLiiklusDeploymentReady)
 	case available.Status == corev1.ConditionFalse:
-		providerCondSet.Manage(ds).MarkFalse(ProviderConditionLiiklusDeploymentReady, available.Reason, available.Message)
+		providerCondSet.Manage(ps).MarkFalse(ProviderConditionLiiklusDeploymentReady, available.Reason, available.Message)
 	}
 }
 
-func (ds *ProviderStatus) MarkLiiklusServiceNotOwned() {
-	providerCondSet.Manage(ds).MarkFalse(ProviderConditionLiiklusServiceReady, "NotOwned",
-		"There is an existing Service %q that we do not own.", ds.LiiklusServiceName)
+func (ps *ProviderStatus) MarkLiiklusServiceNotOwned() {
+	providerCondSet.Manage(ps).MarkFalse(ProviderConditionLiiklusServiceReady, "NotOwned",
+		"There is an existing Service %q that we do not own.", ps.LiiklusServiceName)
 }
 
-func (ds *ProviderStatus) PropagateLiiklusServiceStatus(ss *corev1.ServiceStatus) {
+func (ps *ProviderStatus) PropagateLiiklusServiceStatus(ss *corev1.ServiceStatus) {
 	// services don't have meaningful status
-	providerCondSet.Manage(ds).MarkTrue(ProviderConditionLiiklusServiceReady)
+	providerCondSet.Manage(ps).MarkTrue(ProviderConditionLiiklusServiceReady)
 }
 
-func (ds *ProviderStatus) MarkProvisionerDeploymentNotOwned() {
-	providerCondSet.Manage(ds).MarkFalse(ProviderConditionProvisionerDeploymentReady, "NotOwned",
-		"There is an existing Deployment %q that we do not own.", ds.ProvisionerDeploymentName)
+func (ps *ProviderStatus) MarkProvisionerDeploymentNotOwned() {
+	providerCondSet.Manage(ps).MarkFalse(ProviderConditionProvisionerDeploymentReady, "NotOwned",
+		"There is an existing Deployment %q that we do not own.", ps.ProvisionerDeploymentName)
 }
 
-func (ds *ProviderStatus) PropagateProvisionerDeploymentStatus(cds *appsv1.DeploymentStatus) {
+func (ps *ProviderStatus) PropagateProvisionerDeploymentStatus(cds *appsv1.DeploymentStatus) {
 	var available, progressing *appsv1.DeploymentCondition
 	for i := range cds.Conditions {
 		switch cds.Conditions[i].Type {
@@ -117,25 +120,25 @@ func (ds *ProviderStatus) PropagateProvisionerDeploymentStatus(cds *appsv1.Deplo
 	}
 	if progressing.Status == corev1.ConditionTrue && available.Status == corev1.ConditionFalse {
 		// DeploymentAvailable is False while progressing, avoid reporting ProviderConditionReady as False
-		providerCondSet.Manage(ds).MarkUnknown(ProviderConditionProvisionerDeploymentReady, progressing.Reason, progressing.Message)
+		providerCondSet.Manage(ps).MarkUnknown(ProviderConditionProvisionerDeploymentReady, progressing.Reason, progressing.Message)
 		return
 	}
 	switch {
 	case available.Status == corev1.ConditionUnknown:
-		providerCondSet.Manage(ds).MarkUnknown(ProviderConditionProvisionerDeploymentReady, available.Reason, available.Message)
+		providerCondSet.Manage(ps).MarkUnknown(ProviderConditionProvisionerDeploymentReady, available.Reason, available.Message)
 	case available.Status == corev1.ConditionTrue:
-		providerCondSet.Manage(ds).MarkTrue(ProviderConditionProvisionerDeploymentReady)
+		providerCondSet.Manage(ps).MarkTrue(ProviderConditionProvisionerDeploymentReady)
 	case available.Status == corev1.ConditionFalse:
-		providerCondSet.Manage(ds).MarkFalse(ProviderConditionProvisionerDeploymentReady, available.Reason, available.Message)
+		providerCondSet.Manage(ps).MarkFalse(ProviderConditionProvisionerDeploymentReady, available.Reason, available.Message)
 	}
 }
 
-func (ds *ProviderStatus) MarkProvisionerServiceNotOwned() {
-	providerCondSet.Manage(ds).MarkFalse(ProviderConditionProvisionerServiceReady, "NotOwned",
-		"There is an existing Service %q that we do not own.", ds.ProvisionerServiceName)
+func (ps *ProviderStatus) MarkProvisionerServiceNotOwned() {
+	providerCondSet.Manage(ps).MarkFalse(ProviderConditionProvisionerServiceReady, "NotOwned",
+		"There is an existing Service %q that we do not own.", ps.ProvisionerServiceName)
 }
 
-func (ds *ProviderStatus) PropagateProvisionerServiceStatus(ss *corev1.ServiceStatus) {
+func (ps *ProviderStatus) PropagateProvisionerServiceStatus(ss *corev1.ServiceStatus) {
 	// services don't have meaningful status
-	providerCondSet.Manage(ds).MarkTrue(ProviderConditionProvisionerServiceReady)
+	providerCondSet.Manage(ps).MarkTrue(ProviderConditionProvisionerServiceReady)
 }

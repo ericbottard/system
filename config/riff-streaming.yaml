@@ -426,6 +426,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - create
@@ -560,6 +566,17 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: default
+  namespace: riff-system
+---
+apiVersion: v1
+data:
+  kafka-provisioner: gcr.io/cf-spring-funkytown
+  liiklus: bsideup/liiklus:0.9.0
+kind: ConfigMap
+metadata:
+  labels:
+    component: streaming.projectriff.io
+  name: riff-streaming-streaming-images
   namespace: riff-system
 ---
 apiVersion: v1

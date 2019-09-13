@@ -18,9 +18,11 @@ package streaming
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
+	streamingv1alpha1 "github.com/projectriff/system/pkg/apis/streaming/v1alpha1"
+	"github.com/projectriff/system/pkg/tracker"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -31,21 +33,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	streamingv1alpha1 "github.com/projectriff/system/pkg/apis/streaming/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // ProviderReconciler reconciles a Provider object
 type ProviderReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Tracker   tracker.Tracker
+	Namespace string
 }
 
 // +kubebuilder:rbac:groups=streaming.projectriff.io,resources=providers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=streaming.projectriff.io,resources=providers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 
 func (r *ProviderReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -81,8 +87,20 @@ func (r *ProviderReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 func (r *ProviderReconciler) reconcile(ctx context.Context, log logr.Logger, provider *streamingv1alpha1.Provider) (ctrl.Result, error) {
 
+	// Lookup and track configMap to know which images to use
+	cm := corev1.ConfigMap{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: providerImages}, &cm); err != nil {
+		log.Error(err, "unable to lookup images configMap")
+		return ctrl.Result{}, err
+	}
+	// track config map for new images
+	if err := r.Tracker.Track(&cm, types.NamespacedName{Namespace: provider.GetNamespace(), Name: provider.GetName()}); err != nil {
+		log.Error(err, "unable to setup tracking of images configMap")
+		return ctrl.Result{}, err
+	}
+
 	// Reconcile deployment for liiklus
-	liiklusDeployment, err := r.reconcileLiiklusDeployment(ctx, log, provider)
+	liiklusDeployment, err := r.reconcileLiiklusDeployment(ctx, log, provider, &cm)
 	if err != nil {
 		log.Error(err, "unable to reconcile liiklus Deployment", "provider", provider)
 		return ctrl.Result{}, err
@@ -100,7 +118,7 @@ func (r *ProviderReconciler) reconcile(ctx context.Context, log logr.Logger, pro
 	provider.Status.PropagateLiiklusServiceStatus(&liiklusService.Status)
 
 	// Reconcile deployment for provisioner
-	provisionerDeployment, err := r.reconcileProvisionerDeployment(ctx, log, provider)
+	provisionerDeployment, err := r.reconcileProvisionerDeployment(ctx, log, provider, &cm)
 	if err != nil {
 		log.Error(err, "unable to reconcile provisioner Deployment", "provider", provider)
 		return ctrl.Result{}, err
@@ -121,17 +139,7 @@ func (r *ProviderReconciler) reconcile(ctx context.Context, log logr.Logger, pro
 
 }
 
-func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&streamingv1alpha1.Provider{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.Service{}).
-		Complete(r)
-}
-
-func (r *ProviderReconciler) reconcileLiiklusDeployment(ctx context.Context, log logr.Logger, provider *streamingv1alpha1.Provider) (*appsv1.Deployment, error) {
-	//liiklusDeploymentName := fmt.Sprintf("%s-%s-%s", provider.Namespace, provider.Name, "todo")
-
+func (r *ProviderReconciler) reconcileLiiklusDeployment(ctx context.Context, log logr.Logger, provider *streamingv1alpha1.Provider, cm *corev1.ConfigMap) (*appsv1.Deployment, error) {
 	var actualDeployment appsv1.Deployment
 	if provider.Status.LiiklusDeploymentName != "" {
 		if err := r.Get(ctx, types.NamespacedName{Namespace: provider.Namespace, Name: provider.Status.LiiklusDeploymentName}, &actualDeployment); err != nil {
@@ -150,7 +158,12 @@ func (r *ProviderReconciler) reconcileLiiklusDeployment(ctx context.Context, log
 		}
 	}
 
-	desiredDeployment, err := r.constructLiiklusDeploymentForProvider(provider)
+	liiklusImg := cm.Data[liiklusImageKey]
+	if liiklusImg == "" {
+		return nil, fmt.Errorf("missing liiklus image configuration")
+	}
+
+	desiredDeployment, err := r.constructLiiklusDeploymentForProvider(provider, liiklusImg)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +207,7 @@ func (r *ProviderReconciler) reconcileLiiklusDeployment(ctx context.Context, log
 	return deployment, nil
 }
 
-func (r *ProviderReconciler) constructLiiklusDeploymentForProvider(provider *streamingv1alpha1.Provider) (*appsv1.Deployment, error) {
+func (r *ProviderReconciler) constructLiiklusDeploymentForProvider(provider *streamingv1alpha1.Provider, liiklusImg string) (*appsv1.Deployment, error) {
 	labels := r.constructLiiklusLabelsForProvider(provider)
 
 	env, err := r.liiklusEnvironmentForProvider(provider)
@@ -204,10 +217,10 @@ func (r *ProviderReconciler) constructLiiklusDeploymentForProvider(provider *str
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:       labels,
-			Annotations:  make(map[string]string),
-			GenerateName: fmt.Sprintf("%s-liiklus-", provider.Name),
-			Namespace:    provider.Namespace,
+			Labels:      labels,
+			Annotations: make(map[string]string),
+			Name:        fmt.Sprintf("%s-liiklus", provider.Name),
+			Namespace:   provider.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -223,8 +236,8 @@ func (r *ProviderReconciler) constructLiiklusDeploymentForProvider(provider *str
 					Containers: []corev1.Container{
 						{
 							Name:            "liiklus",
-							Image:           "bsideup/liiklus:0.9.0",
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							Image:           liiklusImg,
+							ImagePullPolicy: corev1.PullAlways,
 							Env:             env,
 						},
 					},
@@ -262,6 +275,7 @@ func (r *ProviderReconciler) constructLiiklusLabelsForProvider(provider *streami
 		labels[k] = v
 	}
 
+	labels[streamingv1alpha1.ProviderLabelKey] = provider.Name
 	labels[streamingv1alpha1.ProviderLiiklusLabelKey] = provider.Name
 
 	return labels
@@ -365,9 +379,7 @@ func (r *ProviderReconciler) constructLiiklusServiceForProvider(provider *stream
 	return service, nil
 }
 
-func (r *ProviderReconciler) reconcileProvisionerDeployment(ctx context.Context, log logr.Logger, provider *streamingv1alpha1.Provider) (*appsv1.Deployment, error) {
-	//liiklusDeploymentName := fmt.Sprintf("%s-%s-%s", provider.Namespace, provider.Name, "todo")
-
+func (r *ProviderReconciler) reconcileProvisionerDeployment(ctx context.Context, log logr.Logger, provider *streamingv1alpha1.Provider, cm *corev1.ConfigMap) (*appsv1.Deployment, error) {
 	var actualDeployment appsv1.Deployment
 	if provider.Status.ProvisionerDeploymentName != "" {
 		if err := r.Get(ctx, types.NamespacedName{Namespace: provider.Namespace, Name: provider.Status.ProvisionerDeploymentName}, &actualDeployment); err != nil {
@@ -386,7 +398,12 @@ func (r *ProviderReconciler) reconcileProvisionerDeployment(ctx context.Context,
 		}
 	}
 
-	desiredDeployment, err := r.constructProvisionerDeploymentForProvider(provider)
+	provisionerImg := cm.Data[provisionerImageKey]
+	if provisionerImg == "" {
+		return nil, fmt.Errorf("missing provisioner image configuration")
+	}
+
+	desiredDeployment, err := r.constructProvisionerDeploymentForProvider(provider, provisionerImg)
 	if err != nil {
 		return nil, err
 	}
@@ -430,21 +447,21 @@ func (r *ProviderReconciler) reconcileProvisionerDeployment(ctx context.Context,
 	return deployment, nil
 }
 
-func (r *ProviderReconciler) constructProvisionerDeploymentForProvider(provider *streamingv1alpha1.Provider) (*appsv1.Deployment, error) {
+func (r *ProviderReconciler) constructProvisionerDeploymentForProvider(provider *streamingv1alpha1.Provider, provisionerImg string) (*appsv1.Deployment, error) {
 	labels := r.constructProvisionerLabelsForProvider(provider)
 
 	switch provider.Spec.BrokerType {
 	case streamingv1alpha1.KafkaBroker:
 		env := []corev1.EnvVar{
-			{Name: "GATEWAY", Value: provider.Status.LiiklusServiceName + ":6565"}, // TODO lookup svc
+			{Name: "GATEWAY", Value: provider.Status.LiiklusServiceName + ":6565"}, // TODO get port numnber from svc lookup
 			{Name: "BROKER", Value: provider.Spec.Config["bootstrapServers"]},
 		}
 		deployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels:       labels,
-				Annotations:  make(map[string]string),
-				GenerateName: fmt.Sprintf("%s-provisioner-", provider.Name),
-				Namespace:    provider.Namespace,
+				Labels:      labels,
+				Annotations: make(map[string]string),
+				Name:        fmt.Sprintf("%s-provisioner", provider.Name),
+				Namespace:   provider.Namespace,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
@@ -460,8 +477,8 @@ func (r *ProviderReconciler) constructProvisionerDeploymentForProvider(provider 
 						Containers: []corev1.Container{
 							{
 								Name:            "main",
-								Image:           "gcr.io/projectriff/kafka-provider/github.com/projectriff/kafka-provider/cmd/provider@sha256:60063d8e2232baf2101a553c6481809da5d0a24a3e47f9361e4a01c721549a9d",
-								ImagePullPolicy: corev1.PullIfNotPresent,
+								Image:           provisionerImg,
+								ImagePullPolicy: corev1.PullAlways,
 								Env:             env,
 							},
 						},
@@ -567,13 +584,35 @@ func (r *ProviderReconciler) constructProvisionerServiceForProvider(provider *st
 }
 
 func (r *ProviderReconciler) constructProvisionerLabelsForProvider(provider *streamingv1alpha1.Provider) map[string]string {
-	labels := make(map[string]string, len(provider.ObjectMeta.Labels)+1)
+	labels := make(map[string]string, len(provider.ObjectMeta.Labels)+2)
 	// pass through existing labels
 	for k, v := range provider.ObjectMeta.Labels {
 		labels[k] = v
 	}
 
+	labels[streamingv1alpha1.ProviderLabelKey] = provider.Name
 	labels[streamingv1alpha1.ProviderProvisionerLabelKey] = provider.Name
 
 	return labels
+}
+
+func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	enqueueTrackedResources := &handler.EnqueueRequestsFromMapFunc{
+		ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+			requests := []reconcile.Request{}
+			if a.Meta.GetNamespace() == r.Namespace && a.Meta.GetName() == providerImages {
+				for _, item := range r.Tracker.Lookup(a.Object.(metav1.ObjectMetaAccessor)) {
+					requests = append(requests, reconcile.Request{NamespacedName: item})
+				}
+			}
+			return requests
+		}),
+	}
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&streamingv1alpha1.Provider{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, enqueueTrackedResources).
+		Complete(r)
 }
