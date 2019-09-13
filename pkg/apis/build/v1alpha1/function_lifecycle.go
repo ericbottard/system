@@ -13,25 +13,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
 package v1alpha1
 
 import (
 	"fmt"
+	buildv1alpha1 "github.com/knative/build/pkg/apis/build/v1alpha1"
+	"github.com/projectriff/system/pkg/apis"
 
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/projectriff/system/pkg/apis"
-	knbuildv1alpha1 "github.com/projectriff/system/pkg/apis/thirdparty/knative/build/v1alpha1"
 )
 
 const (
-	FunctionConditionReady                             = apis.ConditionReady
-	FunctionConditionBuildSucceeded apis.ConditionType = "BuildSucceeded"
-	FunctionConditionImageResolved  apis.ConditionType = "ImageResolved"
+	FunctionConditionReady                              = apis.ConditionReady
+	FunctionConditionBuildCacheReady apis.ConditionType = "BuildCacheReady"
+	FunctionConditionBuildSucceeded  apis.ConditionType = "BuildSucceeded"
+	FunctionConditionImageResolved   apis.ConditionType = "ImageResolved"
 )
 
 var functionCondSet = apis.NewLivingConditionSet(
+	FunctionConditionBuildCacheReady,
 	FunctionConditionBuildSucceeded,
 	FunctionConditionImageResolved,
 )
@@ -56,9 +56,19 @@ func (fs *FunctionStatus) InitializeConditions() {
 	functionCondSet.Manage(fs).InitializeConditions()
 }
 
-func (fs *FunctionStatus) MarkBuildNotOwned() {
+func (fs *FunctionStatus) MarkBuildCacheNotOwned(name string) {
+	functionCondSet.Manage(fs).MarkFalse(FunctionConditionBuildCacheReady, "NotOwned",
+		fmt.Sprintf("There is an existing PersistentVolumeClaim %q that we do not own.", name))
+}
+
+func (fs *FunctionStatus) MarkBuildCacheNotUsed() {
+	fs.BuildCacheName = ""
+	functionCondSet.Manage(fs).MarkTrue(FunctionConditionBuildCacheReady)
+}
+
+func (fs *FunctionStatus) MarkBuildNotOwned(name string) {
 	functionCondSet.Manage(fs).MarkFalse(FunctionConditionBuildSucceeded, "NotOwned",
-		fmt.Sprintf("There is an existing Build %q that we do not own.", fs.BuildName))
+		fmt.Sprintf("There is an existing Build %q that we do not own.", name))
 }
 
 func (fs *FunctionStatus) MarkBuildNotUsed() {
@@ -78,8 +88,22 @@ func (fs *FunctionStatus) MarkImageResolved() {
 	functionCondSet.Manage(fs).MarkTrue(FunctionConditionImageResolved)
 }
 
-func (fs *FunctionStatus) PropagateBuildStatus(bs *knbuildv1alpha1.BuildStatus) {
-	sc := bs.GetCondition(knbuildv1alpha1.BuildSucceeded)
+func (fs *FunctionStatus) PropagateBuildCacheStatus(pvcs *corev1.PersistentVolumeClaimStatus) {
+	switch pvcs.Phase {
+	case corev1.ClaimPending:
+		// used for PersistentVolumeClaims that are not yet bound
+		functionCondSet.Manage(fs).MarkUnknown(FunctionConditionBuildCacheReady, string(pvcs.Phase), "volume claim is not yet bound")
+	case corev1.ClaimBound:
+		// used for PersistentVolumeClaims that are bound
+		functionCondSet.Manage(fs).MarkTrue(FunctionConditionBuildCacheReady)
+	case corev1.ClaimLost:
+		// used for PersistentVolumeClaims that lost their underlying PersistentVolume
+		functionCondSet.Manage(fs).MarkFalse(FunctionConditionBuildCacheReady, string(pvcs.Phase), "volume claim lost its underlying volume")
+	}
+}
+
+func (fs *FunctionStatus) PropagateBuildStatus(bs *buildv1alpha1.BuildStatus) {
+	sc := bs.GetCondition(buildv1alpha1.BuildSucceeded)
 	if sc == nil {
 		return
 	}
