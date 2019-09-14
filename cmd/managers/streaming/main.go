@@ -37,6 +37,7 @@ var (
 	scheme     = runtime.NewScheme()
 	setupLog   = ctrl.Log.WithName("setup")
 	syncPeriod = 10 * time.Hour
+	namespace  = os.Getenv("SYSTEM_NAMESPACE")
 )
 
 func init() {
@@ -68,7 +69,6 @@ func main() {
 	}
 
 	streamControllerLogger := ctrl.Log.WithName("controllers").WithName("Stream")
-	namespace := os.Getenv("SYSTEM_NAMESPACE")
 	if err = (&controllers.ProviderReconciler{
 		Client:    mgr.GetClient(),
 		Log:       ctrl.Log.WithName("controllers").WithName("Provider"),

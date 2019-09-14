@@ -429,6 +429,8 @@ rules:
   - configmaps
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -570,13 +572,13 @@ subjects:
 ---
 apiVersion: v1
 data:
-  kafka-provisioner: gcr.io/cf-spring-funkytown
   liiklus: bsideup/liiklus:0.9.0
+  provisioner: gcr.io/projectriff/kafka-provider/github.com/projectriff/kafka-provider/cmd/provider@sha256:60063d8e2232baf2101a553c6481809da5d0a24a3e47f9361e4a01c721549a9d
 kind: ConfigMap
 metadata:
   labels:
     component: streaming.projectriff.io
-  name: riff-streaming-streaming-images
+  name: riff-streaming-provider
   namespace: riff-system
 ---
 apiVersion: v1
@@ -636,6 +638,11 @@ spec:
         - --enable-leader-election
         command:
         - /manager
+        env:
+        - name: SYSTEM_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         image: streaming-controller:latest
         name: manager
         resources:
