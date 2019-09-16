@@ -17,9 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/projectriff/system/pkg/apis"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	apis "github.com/projectriff/system/pkg/apis"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -50,6 +49,7 @@ type ProcessorStatus struct {
 	OutputAddresses    []string `json:"outputAddresses,omitempty"`
 	OutputContentTypes []string `json:"outputContentTypes,omitempty"`
 	DeploymentName     string   `json:"deploymentName,omitempty"`
+	ScaledObjectName   string   `json:"scaledObjectName,omitempty"`
 	FunctionImage      string   `json:"functionImage,omitempty"`
 }
 
