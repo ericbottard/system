@@ -129,6 +129,9 @@ func (r *ProcessorReconciler) reconcile(ctx context.Context, logger logr.Logger,
 		return ctrl.Result{Requeue: true}, err
 	}
 	processor.Status.PropagateFunctionStatus(&function.Status)
+	if processor.Status.FunctionImage == "" {
+		return ctrl.Result{}, fmt.Errorf("function %q does not have a latestImage", function.Name)
+	}
 
 	// Resolve input addresses
 	inputAddresses, _, err := r.resolveStreams(ctx, processorName, processor.Spec.Inputs)
@@ -161,6 +164,7 @@ func (r *ProcessorReconciler) reconcile(ctx context.Context, logger logr.Logger,
 		return ctrl.Result{}, err
 	}
 	processor.Status.ScaledObjectName = scaledObject.Name
+	processor.Status.PropagateScaledObjectStatus(&scaledObject.Status)
 
 	processor.Status.ObservedGeneration = processor.Generation
 

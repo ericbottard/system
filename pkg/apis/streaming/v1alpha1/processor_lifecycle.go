@@ -16,6 +16,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kedav1alpha1 "github.com/kedacore/keda/pkg/apis/keda/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
@@ -66,17 +67,11 @@ func (ps *ProcessorStatus) PropagateFunctionStatus(fs *buildv1alpha1.FunctionSta
 	ps.FunctionImage = fs.LatestImage
 	ps.FunctionImage = "ericbottard/fn" // TODO remove once build ctrl exists
 
-	sc := fs.GetCondition(buildv1alpha1.FunctionConditionReady)
-	if sc == nil {
-		return
-	}
-	switch {
-	case sc.Status == corev1.ConditionUnknown:
-		processorCondSet.Manage(ps).MarkUnknown(ProcessorConditionFunctionReady, sc.Reason, sc.Message)
-	case sc.Status == corev1.ConditionTrue:
+	if ps.FunctionImage == "" {
+		processorCondSet.Manage(ps).MarkFalse(ProcessorConditionFunctionReady, "NoImage",
+			"Function has no latestImage")
+	} else {
 		processorCondSet.Manage(ps).MarkTrue(ProcessorConditionFunctionReady)
-	case sc.Status == corev1.ConditionFalse:
-		processorCondSet.Manage(ps).MarkFalse(ProcessorConditionFunctionReady, sc.Reason, sc.Message)
 	}
 }
 
@@ -109,4 +104,9 @@ func (ps *ProcessorStatus) PropagateDeploymentStatus(ds *appsv1.DeploymentStatus
 	case ac.Status == corev1.ConditionFalse:
 		processorCondSet.Manage(ps).MarkFalse(ProcessorConditionDeploymentReady, ac.Reason, ac.Message)
 	}
+}
+
+func (ps *ProcessorStatus) PropagateScaledObjectStatus(sos *kedav1alpha1.ScaledObjectStatus) {
+	// TODO: ScaledObject does not report much atm
+	processorCondSet.Manage(ps).MarkTrue(ProcessorConditionScaledObjectReady)
 }
