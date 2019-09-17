@@ -17,7 +17,9 @@ package v1alpha1
 
 import (
 	"fmt"
+
 	buildv1alpha1 "github.com/knative/build/pkg/apis/build/v1alpha1"
+
 	"github.com/projectriff/system/pkg/apis"
 
 	corev1 "k8s.io/api/core/v1"

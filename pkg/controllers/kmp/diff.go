@@ -18,9 +18,11 @@ package kmp
 
 import (
 	"fmt"
+
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
+
 // Commonly used Comparers and other Options go here.
 var defaultOpts []cmp.Option
 

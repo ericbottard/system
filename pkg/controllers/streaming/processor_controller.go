@@ -20,10 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/go-logr/logr"
 	kedav1alpha1 "github.com/kedacore/keda/pkg/apis/keda/v1alpha1"
-	"github.com/projectriff/system/pkg/apis/build/v1alpha1"
-	"github.com/projectriff/system/pkg/tracker"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"strings"
+
+	"github.com/projectriff/system/pkg/apis/build/v1alpha1"
+	"github.com/projectriff/system/pkg/tracker"
 
 	buildv1alpha1 "github.com/projectriff/system/pkg/apis/build/v1alpha1"
 	streamingv1alpha1 "github.com/projectriff/system/pkg/apis/streaming/v1alpha1"
@@ -99,7 +101,6 @@ func (r *ProcessorReconciler) reconcile(ctx context.Context, logger logr.Logger,
 
 	processor.Status.InitializeConditions()
 
-
 	// Lookup and track configMap to know which images to use
 	cm := corev1.ConfigMap{}
 	if err := r.Get(ctx, types.NamespacedName{Namespace: r.Namespace, Name: processorImages}, &cm); err != nil {
@@ -112,9 +113,8 @@ func (r *ProcessorReconciler) reconcile(ctx context.Context, logger logr.Logger,
 		return ctrl.Result{}, err
 	}
 
-
 	// resolve function
-	functionName := types.NamespacedName{Namespace: processor.Namespace, Name: processor.Spec.FunctionRef,}
+	functionName := types.NamespacedName{Namespace: processor.Namespace, Name: processor.Spec.FunctionRef}
 	var function v1alpha1.Function
 	if err := r.Client.Get(ctx, functionName, &function); err != nil {
 		if errors.IsNotFound(err) {
@@ -238,9 +238,9 @@ func (r *ProcessorReconciler) constructScaledObjectForProcessor(processor *strea
 
 	scaledObject := &kedav1alpha1.ScaledObject{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            scaledObjectName(processor),
-			Namespace:       processor.Namespace,
-			Labels:          labels,
+			Name:      scaledObjectName(processor),
+			Namespace: processor.Namespace,
+			Labels:    labels,
 		},
 		Spec: kedav1alpha1.ScaledObjectSpec{
 			ScaleTargetRef: kedav1alpha1.ObjectReference{
@@ -272,12 +272,10 @@ func triggers(proc *streamingv1alpha1.Processor) []kedav1alpha1.ScaleTriggers {
 	return result
 }
 
-
 func (r *ProcessorReconciler) scaledObjectSemanticEquals(desiredDeployment, deployment *kedav1alpha1.ScaledObject) bool {
 	return equality.Semantic.DeepEqual(desiredDeployment.Spec, deployment.Spec) &&
 		equality.Semantic.DeepEqual(desiredDeployment.ObjectMeta.Labels, deployment.ObjectMeta.Labels)
 }
-
 
 func (r *ProcessorReconciler) reconcileProcessorDeployment(ctx context.Context, log logr.Logger, processor *streamingv1alpha1.Processor, cm *corev1.ConfigMap) (*appsv1.Deployment, error) {
 	var actualDeployment appsv1.Deployment

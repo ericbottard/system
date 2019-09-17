@@ -23,15 +23,13 @@ import (
 	"time"
 
 	kedav1alpha1 "github.com/kedacore/keda/pkg/apis/keda/v1alpha1"
-	buildv1alpha1 "github.com/projectriff/system/pkg/apis/build/v1alpha1"
-	streamingv1alpha1 "github.com/projectriff/system/pkg/apis/streaming/v1alpha1"
-	controllers "github.com/projectriff/system/pkg/controllers/streaming"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	buildv1alpha1 "github.com/projectriff/system/pkg/apis/build/v1alpha1"
 	streamingv1alpha1 "github.com/projectriff/system/pkg/apis/streaming/v1alpha1"
 	controllers "github.com/projectriff/system/pkg/controllers/streaming"
 	"github.com/projectriff/system/pkg/tracker"
@@ -96,9 +94,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controllers.ProcessorReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Processor"),
-		Scheme: mgr.GetScheme(),
+		Client:    mgr.GetClient(),
+		Log:       ctrl.Log.WithName("controllers").WithName("Processor"),
+		Scheme:    mgr.GetScheme(),
 		Tracker:   tracker.New(syncPeriod),
 		Namespace: namespace,
 	}).SetupWithManager(mgr); err != nil {
