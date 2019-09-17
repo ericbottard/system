@@ -114,9 +114,9 @@ func (r *ProcessorReconciler) reconcile(ctx context.Context, logger logr.Logger,
 	}
 
 	// resolve function
-	functionName := types.NamespacedName{Namespace: processor.Namespace, Name: processor.Spec.FunctionRef}
+	functionNSName := types.NamespacedName{Namespace: processor.Namespace, Name: processor.Spec.FunctionRef}
 	var function v1alpha1.Function
-	if err := r.Client.Get(ctx, functionName, &function); err != nil {
+	if err := r.Client.Get(ctx, functionNSName, &function); err != nil {
 		if errors.IsNotFound(err) {
 			processor.Status.MarkFunctionNotFound(processor.Spec.FunctionRef)
 		}
@@ -124,8 +124,8 @@ func (r *ProcessorReconciler) reconcile(ctx context.Context, logger logr.Logger,
 	}
 
 	// Track function
-	processorName := namespacedNamedFor(processor)
-	if err := r.Tracker.Track(&function, processorName); err != nil {
+	processorNSName := namespacedNamedFor(processor)
+	if err := r.Tracker.Track(&function, processorNSName); err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
 	processor.Status.PropagateFunctionStatus(&function.Status)
@@ -134,14 +134,14 @@ func (r *ProcessorReconciler) reconcile(ctx context.Context, logger logr.Logger,
 	}
 
 	// Resolve input addresses
-	inputAddresses, _, err := r.resolveStreams(ctx, processorName, processor.Spec.Inputs)
+	inputAddresses, _, err := r.resolveStreams(ctx, processorNSName, processor.Spec.Inputs)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
 	processor.Status.InputAddresses = inputAddresses
 
 	// Resolve output addresses
-	outputAddresses, outputContentTypes, err := r.resolveStreams(ctx, processorName, processor.Spec.Outputs)
+	outputAddresses, outputContentTypes, err := r.resolveStreams(ctx, processorNSName, processor.Spec.Outputs)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
@@ -361,7 +361,7 @@ func (r *ProcessorReconciler) constructDeploymentForProcessor(processor *streami
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      scaledObjectName(processor),
+			Name:      deploymentName(processor),
 			Namespace: processor.Namespace,
 			Labels:    labels,
 		},
@@ -427,12 +427,12 @@ func (r *ProcessorReconciler) resolveStreams(ctx context.Context, processorCoord
 	var addresses []string
 	var contentTypes []string
 	for _, streamName := range streamNames {
-		streamName := types.NamespacedName{
+		streamNSName := types.NamespacedName{
 			Namespace: processorCoordinates.Namespace,
 			Name:      streamName,
 		}
 		var stream streamingv1alpha1.Stream
-		if err := r.Client.Get(ctx, streamName, &stream); err != nil {
+		if err := r.Client.Get(ctx, streamNSName, &stream); err != nil {
 			return nil, nil, err
 		}
 		if err := r.Tracker.Track(&stream, processorCoordinates); err != nil {
