@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	kedav1alpha1 "github.com/kedacore/keda/pkg/apis/keda/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	kedav1alpha1 "github.com/projectriff/system/pkg/apis/thirdparty/keda/v1alpha1"
 
 	"github.com/projectriff/system/pkg/apis/build/v1alpha1"
 	"github.com/projectriff/system/pkg/tracker"
@@ -186,7 +187,7 @@ func (r *ProcessorReconciler) reconcileProcessorScaledObject(ctx context.Context
 		}
 		// check that the scaledObject is not controlled by another resource
 		if !metav1.IsControlledBy(&actualScaledObject, processor) {
-			processor.Status.MarkScaledObjectNotOwned(namespacedName.String())
+			processor.Status.MarkScaledObjectNotOwned()
 			return nil, fmt.Errorf("processor %q does not own ScaledObject %q", processor.Name, actualScaledObject.Name)
 		}
 	}
@@ -296,7 +297,7 @@ func (r *ProcessorReconciler) reconcileProcessorDeployment(ctx context.Context, 
 		}
 		// check that the deployment is not controlled by another resource
 		if !metav1.IsControlledBy(&actualDeployment, processor) {
-			processor.Status.MarkDeploymentNotOwned(namespacedName.String())
+			processor.Status.MarkDeploymentNotOwned()
 			return nil, fmt.Errorf("processor %q does not own Deployment %q", processor.Name, actualDeployment.Name)
 		}
 	}

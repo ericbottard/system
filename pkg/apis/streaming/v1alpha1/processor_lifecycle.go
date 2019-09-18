@@ -16,9 +16,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	kedav1alpha1 "github.com/kedacore/keda/pkg/apis/keda/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+
+	kedav1alpha1 "github.com/projectriff/system/pkg/apis/thirdparty/keda/v1alpha1"
 
 	"github.com/projectriff/system/pkg/apis"
 	buildv1alpha1 "github.com/projectriff/system/pkg/apis/build/v1alpha1"
@@ -65,7 +66,6 @@ func (ps *ProcessorStatus) MarkFunctionNotFound(name string) {
 
 func (ps *ProcessorStatus) PropagateFunctionStatus(fs *buildv1alpha1.FunctionStatus) {
 	ps.FunctionImage = fs.LatestImage
-	ps.FunctionImage = "ericbottard/fn" // TODO remove once build ctrl exists
 
 	if ps.FunctionImage == "" {
 		processorCondSet.Manage(ps).MarkFalse(ProcessorConditionFunctionReady, "NoImage",
@@ -75,34 +75,41 @@ func (ps *ProcessorStatus) PropagateFunctionStatus(fs *buildv1alpha1.FunctionSta
 	}
 }
 
-func (ps *ProcessorStatus) MarkDeploymentNotOwned(name string) {
+func (ps *ProcessorStatus) MarkDeploymentNotOwned() {
 	processorCondSet.Manage(ps).MarkFalse(ProcessorConditionDeploymentReady, "NotOwned",
-		"There is an existing Deployment %q that we do not own.", name)
+		"There is an existing Deployment %q that we do not own.", ps.DeploymentName)
 }
 
-func (ps *ProcessorStatus) MarkScaledObjectNotOwned(name string) {
+func (ps *ProcessorStatus) MarkScaledObjectNotOwned() {
 	processorCondSet.Manage(ps).MarkFalse(ProcessorConditionScaledObjectReady, "NotOwned",
-		"There is an existing ScaledObject %q that we do not own.", name)
+		"There is an existing ScaledObject %q that we do not own.", ps.ScaledObjectName)
 }
 
 func (ps *ProcessorStatus) PropagateDeploymentStatus(ds *appsv1.DeploymentStatus) {
-	var ac *appsv1.DeploymentCondition
-	for _, c := range ds.Conditions {
-		if c.Type == appsv1.DeploymentAvailable {
-			ac = &c
-			break
+	var available, progressing *appsv1.DeploymentCondition
+	for i := range ds.Conditions {
+		switch ds.Conditions[i].Type {
+		case appsv1.DeploymentAvailable:
+			available = &ds.Conditions[i]
+		case appsv1.DeploymentProgressing:
+			progressing = &ds.Conditions[i]
 		}
 	}
-	if ac == nil {
+	if available == nil || progressing == nil {
+		return
+	}
+	if progressing.Status == corev1.ConditionTrue && available.Status == corev1.ConditionFalse {
+		// DeploymentAvailable is False while progressing, avoid reporting DeployerConditionReady as False
+		processorCondSet.Manage(ps).MarkUnknown(ProcessorConditionDeploymentReady, progressing.Reason, progressing.Message)
 		return
 	}
 	switch {
-	case ac.Status == corev1.ConditionUnknown:
-		processorCondSet.Manage(ps).MarkUnknown(ProcessorConditionDeploymentReady, ac.Reason, ac.Message)
-	case ac.Status == corev1.ConditionTrue:
+	case available.Status == corev1.ConditionUnknown:
+		processorCondSet.Manage(ps).MarkUnknown(ProcessorConditionDeploymentReady, available.Reason, available.Message)
+	case available.Status == corev1.ConditionTrue:
 		processorCondSet.Manage(ps).MarkTrue(ProcessorConditionDeploymentReady)
-	case ac.Status == corev1.ConditionFalse:
-		processorCondSet.Manage(ps).MarkFalse(ProcessorConditionDeploymentReady, ac.Reason, ac.Message)
+	case available.Status == corev1.ConditionFalse:
+		processorCondSet.Manage(ps).MarkFalse(ProcessorConditionDeploymentReady, available.Reason, available.Message)
 	}
 }
 
