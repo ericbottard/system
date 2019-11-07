@@ -474,16 +474,20 @@ func (r *ProcessorReconciler) resolveStreams(ctx context.Context, processorCoord
 			Name:      binding.Stream,
 		}
 		var stream streamingv1alpha1.Stream
+		if err := r.Client.Get(ctx, streamNSName, &stream); err != nil {
+			return nil, nil, err
+		} else if !stream.Status.IsReady() {
+			return nil, nil, fmt.Errorf("stream %q is not Ready", streamNSName)
+		}
+
+		addresses = append(addresses, stream.Status.Address.String())
+		contentTypes = append(contentTypes, stream.Spec.ContentType)
+
 		// track stream for new coordinates
 		r.Tracker.Track(
 			tracker.NewKey(stream.GetGroupVersionKind(), streamNSName),
 			processorCoordinates,
 		)
-		if err := r.Client.Get(ctx, streamNSName, &stream); err != nil {
-			return nil, nil, err
-		}
-		addresses = append(addresses, stream.Status.Address.String())
-		contentTypes = append(contentTypes, stream.Spec.ContentType)
 	}
 	return addresses, contentTypes, nil
 }
