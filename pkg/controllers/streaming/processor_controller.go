@@ -173,45 +173,53 @@ func (r *ProcessorReconciler) reconcile(ctx context.Context, logger logr.Logger,
 		return ctrl.Result{}, fmt.Errorf("could not resolve an image")
 	}
 
+	outcome := outcome{}
+	forceTearDown := false
 	// Resolve input addresses
 	inputAddresses, _, err := r.resolveStreams(ctx, processorNSName, processor.Spec.Inputs)
-	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+	if err == nil {
+		processor.Status.InputAddresses = inputAddresses
+	} else {
+		outcome = outcome.coalesce(requeueing(err))
+		forceTearDown = true
 	}
-	processor.Status.InputAddresses = inputAddresses
 
 	// Resolve output addresses
 	outputAddresses, outputContentTypes, err := r.resolveStreams(ctx, processorNSName, processor.Spec.Outputs)
-	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+	if err == nil {
+		processor.Status.OutputAddresses = outputAddresses
+		processor.Status.OutputContentTypes = outputContentTypes
+	} else {
+		outcome = outcome.coalesce(requeueing(err))
+		forceTearDown = true
 	}
-	processor.Status.OutputAddresses = outputAddresses
-	processor.Status.OutputContentTypes = outputContentTypes
 
 	// Reconcile deployment for processor
-	deployment, err := r.reconcileProcessorDeployment(ctx, logger, processor, &cm)
-	if err != nil {
+	deployment, err := r.reconcileProcessorDeployment(ctx, logger, processor, &cm, forceTearDown)
+	if err == nil {
+		processor.Status.DeploymentName = deployment.Name
+		processor.Status.PropagateDeploymentStatus(&deployment.Status)
+	} else {
 		logger.Error(err, "unable to reconcile deployment")
-		return ctrl.Result{}, err
+		outcome = outcome.coalesce(notRequeueing(err))
 	}
-	processor.Status.DeploymentName = deployment.Name
-	processor.Status.PropagateDeploymentStatus(&deployment.Status)
 
 	// Reconcile scaledObject for processor
-	scaledObject, err := r.reconcileProcessorScaledObject(ctx, logger, processor, deployment)
-	if err != nil {
+	scaledObject, err := r.reconcileProcessorScaledObject(ctx, logger, processor, deployment, forceTearDown)
+	if err == nil {
+		processor.Status.ScaledObjectName = scaledObject.Name
+		processor.Status.PropagateScaledObjectStatus(&scaledObject.Status)
+	} else {
 		logger.Error(err, "unable to reconcile scaledObject")
-		return ctrl.Result{}, err
+		outcome = outcome.coalesce(notRequeueing(err))
 	}
-	processor.Status.ScaledObjectName = scaledObject.Name
-	processor.Status.PropagateScaledObjectStatus(&scaledObject.Status)
 
 	processor.Status.ObservedGeneration = processor.Generation
 
-	return ctrl.Result{}, nil
+	return outcome.Result, outcome.error
 }
 
-func (r *ProcessorReconciler) reconcileProcessorScaledObject(ctx context.Context, log logr.Logger, processor *streamingv1alpha1.Processor, deployment *appsv1.Deployment) (*kedav1alpha1.ScaledObject, error) {
+func (r *ProcessorReconciler) reconcileProcessorScaledObject(ctx context.Context, log logr.Logger, processor *streamingv1alpha1.Processor, deployment *appsv1.Deployment, forceTearDown bool) (*kedav1alpha1.ScaledObject, error) {
 	var actualScaledObject kedav1alpha1.ScaledObject
 	var childScaledObjects kedav1alpha1.ScaledObjectList
 	if err := r.List(ctx, &childScaledObjects, client.InNamespace(processor.Namespace), client.MatchingField(processorScaledObjectIndexField, processor.Name)); err != nil {
@@ -236,7 +244,7 @@ func (r *ProcessorReconciler) reconcileProcessorScaledObject(ctx context.Context
 	}
 
 	// delete scaledObject if no longer needed
-	if desiredScaledObject == nil {
+	if desiredScaledObject == nil || forceTearDown {
 		if err := r.Delete(ctx, &actualScaledObject); err != nil {
 			log.Error(err, "unable to delete ScaledObject for Processor", "scaledObject", actualScaledObject)
 			return nil, err
@@ -325,7 +333,7 @@ func (r *ProcessorReconciler) scaledObjectSemanticEquals(desiredDeployment, depl
 		equality.Semantic.DeepEqual(desiredDeployment.ObjectMeta.Labels, deployment.ObjectMeta.Labels)
 }
 
-func (r *ProcessorReconciler) reconcileProcessorDeployment(ctx context.Context, log logr.Logger, processor *streamingv1alpha1.Processor, cm *corev1.ConfigMap) (*appsv1.Deployment, error) {
+func (r *ProcessorReconciler) reconcileProcessorDeployment(ctx context.Context, log logr.Logger, processor *streamingv1alpha1.Processor, cm *corev1.ConfigMap, forceTearDown bool) (*appsv1.Deployment, error) {
 	var actualDeployment appsv1.Deployment
 	var childDeployments appsv1.DeploymentList
 	if err := r.List(ctx, &childDeployments, client.InNamespace(processor.Namespace), client.MatchingField(processorDeploymentIndexField, processor.Name)); err != nil {
@@ -355,7 +363,7 @@ func (r *ProcessorReconciler) reconcileProcessorDeployment(ctx context.Context, 
 	}
 
 	// delete deployment if no longer needed
-	if desiredDeployment == nil {
+	if desiredDeployment == nil || forceTearDown {
 		if err := r.Delete(ctx, &actualDeployment); err != nil {
 			log.Error(err, "unable to delete Deployment for Processor", "deployment", actualDeployment)
 			return nil, err
@@ -474,6 +482,11 @@ func (r *ProcessorReconciler) resolveStreams(ctx context.Context, processorCoord
 			Name:      binding.Stream,
 		}
 		var stream streamingv1alpha1.Stream
+		// track stream for new coordinates
+		r.Tracker.Track(
+			tracker.NewKey(stream.GetGroupVersionKind(), streamNSName),
+			processorCoordinates,
+		)
 		if err := r.Client.Get(ctx, streamNSName, &stream); err != nil {
 			return nil, nil, err
 		} else if !stream.Status.IsReady() {
@@ -483,11 +496,6 @@ func (r *ProcessorReconciler) resolveStreams(ctx context.Context, processorCoord
 		addresses = append(addresses, stream.Status.Address.String())
 		contentTypes = append(contentTypes, stream.Spec.ContentType)
 
-		// track stream for new coordinates
-		r.Tracker.Track(
-			tracker.NewKey(stream.GetGroupVersionKind(), streamNSName),
-			processorCoordinates,
-		)
 	}
 	return addresses, contentTypes, nil
 }
@@ -537,6 +545,41 @@ func (*ProcessorReconciler) collectAliases(bindings []streamingv1alpha1.StreamBi
 		names[i] = bindings[i].Alias
 	}
 	return names
+}
+
+type outcome struct {
+	ctrl.Result
+	error
+}
+
+func requeueing(err error) outcome {
+	return outcome{Result: ctrl.Result{Requeue: true}, error: err}
+}
+
+func notRequeueing(err error) outcome {
+	return outcome{Result: ctrl.Result{Requeue: false}, error: err}
+}
+
+// coalesce returns an outcome that is the "worse" between o and other: requeueing and having an error set is
+// prioritized over not requeueing and not having an error.
+func (o outcome) coalesce(other outcome) outcome {
+	result := outcome{}
+	if other.RequeueAfter.Nanoseconds() < o.RequeueAfter.Nanoseconds() {
+		result.RequeueAfter = other.RequeueAfter
+	} else {
+		result.RequeueAfter = o.RequeueAfter
+	}
+	if other.Requeue {
+		result.Requeue = other.Requeue
+	} else {
+		result.Requeue = o.Requeue
+	}
+	if other.error != nil {
+		result.error = other.error
+	} else {
+		result.error = o.error
+	}
+	return result
 }
 
 func (r *ProcessorReconciler) SetupWithManager(mgr ctrl.Manager) error {
