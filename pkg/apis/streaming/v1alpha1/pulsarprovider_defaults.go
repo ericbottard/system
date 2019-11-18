@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package v1alpha1
 
-package streaming
+import "sigs.k8s.io/controller-runtime/pkg/webhook"
 
-const (
-	kustomizePrefix = "riff-streaming" // kustomize adds this prefix to all our resource names
+// +kubebuilder:webhook:path=/mutate-streaming-projectriff-io-v1alpha1-pulsarprovider,mutating=true,failurePolicy=fail,groups=streaming.projectriff.io,resources=pulsarproviders,verbs=create;update,versions=v1alpha1,name=pulsarproviders.streaming.projectriff.io
 
-	kafkaProviderImages  = kustomizePrefix + "-kafka-provider"  // contains image names for the kafka provider
-	pulsarProviderImages = kustomizePrefix + "-pulsar-provider" // contains image names for the kafka provider
-	gatewayImageKey      = "gatewayImage"
-	provisionerImageKey  = "provisionerImage"
+var _ webhook.Defaulter = &PulsarProvider{}
 
-	processorImages   = kustomizePrefix + "-processor" // contains image names for the streaming processor
-	processorImageKey = "processorImage"
-)
+// Default implements webhook.Defaulter so a webhook will be registered for the type
+func (r *PulsarProvider) Default() {
+	r.Spec.Default()
+}
+
+func (s *PulsarProviderSpec) Default() {
+}

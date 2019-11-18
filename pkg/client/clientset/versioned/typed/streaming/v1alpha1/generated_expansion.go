@@ -21,4 +21,6 @@ type KafkaProviderExpansion interface{}
 
 type ProcessorExpansion interface{}
 
+type PulsarProviderExpansion interface{}
+
 type StreamExpansion interface{}
