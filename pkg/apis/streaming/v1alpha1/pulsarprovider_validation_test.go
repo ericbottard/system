@@ -37,7 +37,7 @@ func TestValidatePulsarProvider(t *testing.T) {
 		name: "valid",
 		target: &PulsarProvider{
 			Spec: PulsarProviderSpec{
-				ServiceURL: "pulsar:://localhost:6650",
+				ServiceURL: "pulsar://localhost:6650",
 			},
 		},
 		expected: validation.FieldErrors{},
