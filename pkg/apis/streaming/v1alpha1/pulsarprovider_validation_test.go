@@ -19,6 +19,8 @@ package v1alpha1
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
+
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/projectriff/system/pkg/validation"
@@ -66,6 +68,12 @@ func TestValidatePulsarProviderSpec(t *testing.T) {
 			ServiceURL: "pulsar://localhost:6650",
 		},
 		expected: validation.FieldErrors{},
+	}, {
+		name: "wrong-scheme",
+		target: &PulsarProviderSpec{
+			ServiceURL: "localhost:6650",
+		},
+		expected: validation.FieldErrors{field.Required(field.NewPath("serviceURL"), "serviceURL must use 'pulsar://' or 'pulsar+ssl://' scheme")},
 	}} {
 		t.Run(c.name, func(t *testing.T) {
 			actual := c.target.Validate()
