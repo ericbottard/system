@@ -4,4 +4,4 @@ metadata:
   name: pulsar-provider
 data:
   gatewayImage: bsideup/liiklus:0.9.0
-  provisionerImage: gcr.io/cf-spring-funkytown/provisioner-46159645f685fedb8f6279549d9d9574@sha256:2f96812b68de0a268686b28c04024da28ab969a3fdaa892e32f33fdb0ebc7667
+  provisionerImage: gcr.io/projectriff/pulsar-provisioner/provisioner-46159645f685fedb8f6279549d9d9574@sha256:718d5b69c03d8932edf81dd88a7d25cef81efc795c80056e866bfa865b5e3528
