@@ -65,7 +65,6 @@ func (r *PulsarProviderReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 	ctx := context.Background()
 	log := r.Log.WithValues("pulsarprovider", req.NamespacedName)
 
-	// your logic here
 	var pulsarProvider streamingv1alpha1.PulsarProvider
 	if err := r.Get(ctx, req.NamespacedName, &pulsarProvider); err != nil {
 		log.Error(err, "unable to fetch PulsarProvider")
