@@ -73,7 +73,9 @@ func TestValidatePulsarProviderSpec(t *testing.T) {
 		target: &PulsarProviderSpec{
 			ServiceURL: "localhost:6650",
 		},
-		expected: validation.FieldErrors{field.Required(field.NewPath("serviceURL"), "serviceURL must use 'pulsar://' or 'pulsar+ssl://' scheme")},
+		expected: validation.FieldErrors{}.Also(
+			field.Invalid(field.NewPath("serviceURL"), "must use 'pulsar://' or 'pulsar+ssl://' scheme"),
+		),
 	}} {
 		t.Run(c.name, func(t *testing.T) {
 			actual := c.target.Validate()
