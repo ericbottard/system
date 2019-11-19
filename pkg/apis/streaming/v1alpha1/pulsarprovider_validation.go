@@ -69,7 +69,7 @@ func (s *PulsarProviderSpec) Validate() validation.FieldErrors {
 		errs = errs.Also(validation.ErrMissingField("serviceURL"))
 	} else if !(strings.HasPrefix(s.ServiceURL, "pulsar://") || strings.HasPrefix(s.ServiceURL, "pulsar+ssl://")) {
 		errs = errs.Also(validation.FieldErrors{
-			field.Required(field.NewPath("serviceURL"), "serviceURL must use 'pulsar://' or 'pulsar+ssl://' scheme"),
+			field.Invalid(field.NewPath("serviceURL"), "must use 'pulsar://' or 'pulsar+ssl://' scheme"),
 		})
 	}
 
