@@ -41,7 +41,7 @@ func TestValidateProcessor(t *testing.T) {
 				Build: &Build{
 					FunctionRef: "my-func",
 				},
-				Inputs: []StreamBinding{
+				Inputs: []InputStreamBinding{
 					{Stream: "my-stream", Alias: "in"},
 				},
 				Template: &corev1.PodTemplateSpec{
@@ -65,6 +65,11 @@ func TestValidateProcessor(t *testing.T) {
 }
 
 func TestValidateProcessorSpec(t *testing.T) {
+	var earliest = int64(Earliest)
+	var latest = int64(Latest)
+	var bogus = int64(42)
+	_ = bogus
+
 	for _, c := range []struct {
 		name     string
 		target   *ProcessorSpec
@@ -79,7 +84,7 @@ func TestValidateProcessorSpec(t *testing.T) {
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream", Alias: "in"},
 			},
 			Template: &corev1.PodTemplateSpec{
@@ -94,7 +99,7 @@ func TestValidateProcessorSpec(t *testing.T) {
 	}, {
 		name: "requires function ref or container image",
 		target: &ProcessorSpec{
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream", Alias: "in"},
 			},
 			Template: &corev1.PodTemplateSpec{
@@ -112,7 +117,7 @@ func TestValidateProcessorSpec(t *testing.T) {
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream", Alias: "in"},
 			},
 			Template: &corev1.PodTemplateSpec{
@@ -146,7 +151,7 @@ func TestValidateProcessorSpec(t *testing.T) {
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{},
 			},
 			Template: &corev1.PodTemplateSpec{
@@ -167,7 +172,7 @@ func TestValidateProcessorSpec(t *testing.T) {
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream", Alias: "in"},
 			},
 			Template: &corev1.PodTemplateSpec{
@@ -185,10 +190,10 @@ func TestValidateProcessorSpec(t *testing.T) {
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream", Alias: "in"},
 			},
-			Outputs: []StreamBinding{
+			Outputs: []OutputStreamBinding{
 				{},
 			},
 			Template: &corev1.PodTemplateSpec{
@@ -209,10 +214,10 @@ func TestValidateProcessorSpec(t *testing.T) {
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream", Alias: "my-input"},
 			},
-			Outputs: []StreamBinding{
+			Outputs: []OutputStreamBinding{
 				{Stream: "my-stream", Alias: "my-output"},
 			},
 			Template: &corev1.PodTemplateSpec{
@@ -225,16 +230,53 @@ func TestValidateProcessorSpec(t *testing.T) {
 		},
 		expected: validation.FieldErrors{},
 	}, {
+		name: "valid offsets",
+		target: &ProcessorSpec{
+			Build: &Build{
+				FunctionRef: "my-func",
+			},
+			Inputs: []InputStreamBinding{
+				{Stream: "my-stream", Alias: "in1", StartOffset: &latest},
+				{Stream: "my-stream", Alias: "in2", StartOffset: &earliest},
+			},
+			Template: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "function"},
+					},
+				},
+			},
+		},
+		expected: validation.FieldErrors{},
+	}, {
+		name: "invalid offset",
+		target: &ProcessorSpec{
+			Build: &Build{
+				FunctionRef: "my-func",
+			},
+			Inputs: []InputStreamBinding{
+				{Stream: "my-stream", Alias: "my-input", StartOffset: &bogus},
+			},
+			Template: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "function"},
+					},
+				},
+			},
+		},
+		expected: validation.ErrInvalidValue(&bogus, "inputs[0].startOffset"),
+	}, {
 		name: "input alias collision",
 		target: &ProcessorSpec{
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream1", Alias: "my-input"},
 				{Stream: "my-stream2", Alias: "my-input"},
 			},
-			Outputs: []StreamBinding{},
+			Outputs: []OutputStreamBinding{},
 			Template: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -249,10 +291,10 @@ func TestValidateProcessorSpec(t *testing.T) {
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream1", Alias: "my-alias"},
 			},
-			Outputs: []StreamBinding{
+			Outputs: []OutputStreamBinding{
 				{Stream: "my-stream2", Alias: "my-alias"},
 			},
 			Template: &corev1.PodTemplateSpec{
@@ -270,10 +312,10 @@ func TestValidateProcessorSpec(t *testing.T) {
 			Build: &Build{
 				FunctionRef: "my-func",
 			},
-			Inputs: []StreamBinding{
+			Inputs: []InputStreamBinding{
 				{Stream: "my-stream", Alias: "my-input"},
 			},
-			Outputs: []StreamBinding{
+			Outputs: []OutputStreamBinding{
 				{Stream: "my-stream", Alias: "my-output"},
 			},
 			Template: &corev1.PodTemplateSpec{
