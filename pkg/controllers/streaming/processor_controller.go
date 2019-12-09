@@ -644,6 +644,7 @@ func (r *ProcessorReconciler) computeEnvironmentVariables(processor *streamingv1
 		return nil, err
 	}
 	inputsNames := r.collectInputAliases(processor.Spec.Inputs)
+	inputStartOffsets := r.collectInputStartOffsets(processor.Spec.Inputs)
 	outputsNames := r.collectOutputAliases(processor.Spec.Outputs)
 	return []v1.EnvVar{
 		{
@@ -659,6 +660,10 @@ func (r *ProcessorReconciler) computeEnvironmentVariables(processor *streamingv1
 			// TODO remove once the processor images consumes bindings
 			Name:  "OUTPUTS",
 			Value: strings.Join(processor.Status.DeprecatedOutputAddresses, ","),
+		},
+		{
+			Name:  "INPUT_START_OFFSETS",
+			Value: strings.Join(inputStartOffsets, ","),
 		},
 		{
 			Name:  "INPUT_NAMES",
@@ -698,6 +703,14 @@ func (*ProcessorReconciler) collectInputAliases(bindings []streamingv1alpha1.Inp
 		names[i] = bindings[i].Alias
 	}
 	return names
+}
+
+func (*ProcessorReconciler) collectInputStartOffsets(bindings []streamingv1alpha1.InputStreamBinding) []string {
+	offsets := make([]string, len(bindings))
+	for i := range bindings {
+		offsets[i] = bindings[i].StartOffset
+	}
+	return offsets
 }
 
 func (r *ProcessorReconciler) SetupWithManager(mgr ctrl.Manager) error {
