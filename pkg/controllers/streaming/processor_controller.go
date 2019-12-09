@@ -669,12 +669,16 @@ func (*ProcessorReconciler) collectAliases(bindings []streamingv1alpha1.StreamBi
 }
 
 func (r *ProcessorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	enqueueTrackedResources := func(t apis.Resource) handler.EventHandler {
+	enqueueTrackedResources := func(t runtime.Object) handler.EventHandler {
+		versionKinds, _, err := r.Scheme.ObjectKinds(t)
+		if err != nil {
+			panic(err)
+		}
 		return &handler.EnqueueRequestsFromMapFunc{
 			ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-				requests := []reconcile.Request{}
+				var requests []reconcile.Request
 				key := tracker.NewKey(
-					t.GetGroupVersionKind(),
+					versionKinds[0],
 					types.NamespacedName{Namespace: a.Meta.GetNamespace(), Name: a.Meta.GetName()},
 				)
 				for _, item := range r.Tracker.Lookup(key) {
@@ -683,21 +687,6 @@ func (r *ProcessorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return requests
 			}),
 		}
-	}
-	enqueueNamedTrackedConfigMap := &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-			requests := []reconcile.Request{}
-			if a.Meta.GetNamespace() == r.Namespace && a.Meta.GetName() == processorImages {
-				key := tracker.NewKey(
-					schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
-					types.NamespacedName{Namespace: a.Meta.GetNamespace(), Name: a.Meta.GetName()},
-				)
-				for _, item := range r.Tracker.Lookup(key) {
-					requests = append(requests, reconcile.Request{NamespacedName: item})
-				}
-			}
-			return requests
-		}),
 	}
 
 	if err := controllers.IndexControllersOfType(mgr, processorDeploymentIndexField, &streamingv1alpha1.Processor{}, &appsv1.Deployment{}); err != nil {
@@ -714,6 +703,6 @@ func (r *ProcessorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &buildv1alpha1.Container{}}, enqueueTrackedResources(&buildv1alpha1.Container{})).
 		Watches(&source.Kind{Type: &buildv1alpha1.Function{}}, enqueueTrackedResources(&buildv1alpha1.Function{})).
 		Watches(&source.Kind{Type: &streamingv1alpha1.Stream{}}, enqueueTrackedResources(&streamingv1alpha1.Stream{})).
-		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, enqueueNamedTrackedConfigMap).
+		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, enqueueTrackedResources(&v1.ConfigMap{})).
 		Complete(r)
 }
