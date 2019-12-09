@@ -315,8 +315,7 @@ spec:
                   alias:
                     type: string
                   startOffset:
-                    format: int64
-                    type: integer
+                    type: string
                   stream:
                     type: string
                 required:

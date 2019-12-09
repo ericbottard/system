@@ -24,9 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var latestAsVar = int64(Latest)
-var latest = &latestAsVar
-
 func TestProcessorDefault(t *testing.T) {
 	tests := []struct {
 		name string
@@ -101,7 +98,7 @@ func TestProcessorSpecDefault(t *testing.T) {
 			}},
 		want: &ProcessorSpec{
 			Inputs: []InputStreamBinding{
-				{Stream: "my-input", Alias: "my-input", StartOffset: latest},
+				{Stream: "my-input", Alias: "my-input", StartOffset: Latest},
 			},
 			Outputs: []OutputStreamBinding{
 				{Stream: "my-output", Alias: "my-output"},
@@ -130,7 +127,7 @@ func TestProcessorSpecDefault(t *testing.T) {
 			}},
 		want: &ProcessorSpec{
 			Inputs: []InputStreamBinding{
-				{Stream: "my-input", Alias: "in", StartOffset: latest},
+				{Stream: "my-input", Alias: "in", StartOffset: Latest},
 			},
 			Outputs: []OutputStreamBinding{
 				{Stream: "my-output", Alias: "out"},

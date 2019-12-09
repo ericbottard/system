@@ -76,8 +76,8 @@ type OutputStreamBinding struct {
 }
 
 const (
-	Earliest = int64(-1)
-	Latest   = int64(-2)
+	Earliest = "earliest"
+	Latest   = "latest"
 )
 
 type InputStreamBinding struct {
@@ -89,7 +89,7 @@ type InputStreamBinding struct {
 	Alias string `json:"alias,omitempty"`
 
 	// Where to start consuming this stream the first time a processor runs.
-	StartOffset *int64 `json:"startOffset"`
+	StartOffset string `json:"startOffset"`
 }
 
 // ProcessorStatus defines the observed state of Processor

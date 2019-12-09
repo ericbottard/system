@@ -65,11 +65,6 @@ func TestValidateProcessor(t *testing.T) {
 }
 
 func TestValidateProcessorSpec(t *testing.T) {
-	var earliest = int64(Earliest)
-	var latest = int64(Latest)
-	var bogus = int64(42)
-	_ = bogus
-
 	for _, c := range []struct {
 		name     string
 		target   *ProcessorSpec
@@ -236,8 +231,8 @@ func TestValidateProcessorSpec(t *testing.T) {
 				FunctionRef: "my-func",
 			},
 			Inputs: []InputStreamBinding{
-				{Stream: "my-stream", Alias: "in1", StartOffset: &latest},
-				{Stream: "my-stream", Alias: "in2", StartOffset: &earliest},
+				{Stream: "my-stream", Alias: "in1", StartOffset: Latest},
+				{Stream: "my-stream", Alias: "in2", StartOffset: Earliest},
 			},
 			Template: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -255,7 +250,7 @@ func TestValidateProcessorSpec(t *testing.T) {
 				FunctionRef: "my-func",
 			},
 			Inputs: []InputStreamBinding{
-				{Stream: "my-stream", Alias: "my-input", StartOffset: &bogus},
+				{Stream: "my-stream", Alias: "my-input", StartOffset: "42"},
 			},
 			Template: &corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -265,7 +260,7 @@ func TestValidateProcessorSpec(t *testing.T) {
 				},
 			},
 		},
-		expected: validation.ErrInvalidValue(&bogus, "inputs[0].startOffset"),
+		expected: validation.ErrInvalidValue("42", "inputs[0].startOffset"),
 	}, {
 		name: "input alias collision",
 		target: &ProcessorSpec{

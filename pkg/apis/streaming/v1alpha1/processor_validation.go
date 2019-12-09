@@ -98,7 +98,7 @@ func (s *ProcessorSpec) Validate() validation.FieldErrors {
 		if input.Alias == "" {
 			errs = errs.Also(validation.ErrMissingField("alias").ViaFieldIndex("inputs", i))
 		}
-		if input.StartOffset != nil && *input.StartOffset != Earliest && *input.StartOffset != Latest {
+		if input.StartOffset != "" && input.StartOffset != Earliest && input.StartOffset != Latest {
 			errs = errs.Also(validation.ErrInvalidValue(input.StartOffset, fmt.Sprintf("inputs[%d].startOffset", i)))
 		}
 	}

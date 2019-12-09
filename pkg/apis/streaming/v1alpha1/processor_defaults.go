@@ -33,13 +33,12 @@ func (s *ProcessorSpec) Default() {
 	if s.Inputs == nil {
 		s.Inputs = []InputStreamBinding{}
 	}
-	latest := Latest
 	for i := range s.Inputs {
 		if s.Inputs[i].Alias == "" {
 			s.Inputs[i].Alias = s.Inputs[i].Stream
 		}
-		if s.Inputs[i].StartOffset == nil {
-			s.Inputs[i].StartOffset = &latest
+		if s.Inputs[i].StartOffset == "" {
+			s.Inputs[i].StartOffset = Latest
 		}
 	}
 
