@@ -76,7 +76,9 @@ type ProcessorReconciler struct {
 // +kubebuilder:rbac:groups=keda.k8s.io,resources=scaledobjects,verbs=get;list;watch;create;update;patch;delete
 // Watches
 // +kubebuilder:rbac:groups=streaming.projectriff.io,resources=streams,verbs=get;watch
-// +kubebuilder:rbac:groups=build.projectriff.io,resources=containers;functions,verbs=get;watch
+// +kubebuilder:rbac:groups=build.projectriff.io,resources=containers,verbs=get;watch
+// +kubebuilder:rbac:groups=build.projectriff.io,resources=functions,verbs=get;watch
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 
 func (r *ProcessorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -682,6 +684,21 @@ func (r *ProcessorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}),
 		}
 	}
+	enqueueNamedTrackedConfigMap := &handler.EnqueueRequestsFromMapFunc{
+		ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+			requests := []reconcile.Request{}
+			if a.Meta.GetNamespace() == r.Namespace && a.Meta.GetName() == processorImages {
+				key := tracker.NewKey(
+					schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+					types.NamespacedName{Namespace: a.Meta.GetNamespace(), Name: a.Meta.GetName()},
+				)
+				for _, item := range r.Tracker.Lookup(key) {
+					requests = append(requests, reconcile.Request{NamespacedName: item})
+				}
+			}
+			return requests
+		}),
+	}
 
 	if err := controllers.IndexControllersOfType(mgr, processorDeploymentIndexField, &streamingv1alpha1.Processor{}, &appsv1.Deployment{}); err != nil {
 		return err
@@ -697,5 +714,6 @@ func (r *ProcessorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &buildv1alpha1.Container{}}, enqueueTrackedResources(&buildv1alpha1.Container{})).
 		Watches(&source.Kind{Type: &buildv1alpha1.Function{}}, enqueueTrackedResources(&buildv1alpha1.Function{})).
 		Watches(&source.Kind{Type: &streamingv1alpha1.Stream{}}, enqueueTrackedResources(&streamingv1alpha1.Stream{})).
+		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, enqueueNamedTrackedConfigMap).
 		Complete(r)
 }
