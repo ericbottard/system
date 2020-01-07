@@ -3187,6 +3187,9 @@ spec:
   - JSONPath: .status.conditions[?(@.type=="Ready")].reason
     name: Reason
     type: string
+  - JSONPath: .spec.contentType
+    name: Content-Type
+    type: string
   group: streaming.projectriff.io
   names:
     categories:
