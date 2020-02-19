@@ -6439,7 +6439,7 @@ subjects:
 ---
 apiVersion: v1
 data:
-  gatewayImage: ctr.run/github.com/bsideup/liiklus:00385b688bc34d6fdbe2b5eeb39daa26e09f8b02
+  gatewayImage: ctr.run/github.com/bsideup/liiklus:12037c2c6c326e3c1f15af370c4a6d212d58084b
   provisionerImage: gcr.io/projectriff/nop-provisioner/provisioner@sha256:4bfa270f904a979c858d50267bb5e99df3b4ec44babe993f949193404f58f64b
 kind: ConfigMap
 metadata:
@@ -6450,7 +6450,7 @@ metadata:
 ---
 apiVersion: v1
 data:
-  gatewayImage: ctr.run/github.com/bsideup/liiklus:00385b688bc34d6fdbe2b5eeb39daa26e09f8b02
+  gatewayImage: ctr.run/github.com/bsideup/liiklus:12037c2c6c326e3c1f15af370c4a6d212d58084b
   provisionerImage: gcr.io/projectriff/kafka-provisioner/provisioner@sha256:c5917a348faae5ababb7371be200c933d50f12f2698d6635d138f047300d68a6
 kind: ConfigMap
 metadata:
@@ -6461,7 +6461,7 @@ metadata:
 ---
 apiVersion: v1
 data:
-  processorImage: ericbottard/processor-native@sha256:9e1a16a68bd58e61c34e6bfc0af4c25fbd3f04fa2a045f0cd156c0ed71c8a641
+  processorImage: gcr.io/projectriff/streaming-processor/processor-native@sha256:d423f7b2625cfb2925cd8c7921f03a4f0e2d6ed587c45c2c21943dc82f02f713
 kind: ConfigMap
 metadata:
   labels:
@@ -6471,7 +6471,7 @@ metadata:
 ---
 apiVersion: v1
 data:
-  gatewayImage: ctr.run/github.com/bsideup/liiklus:00385b688bc34d6fdbe2b5eeb39daa26e09f8b02
+  gatewayImage: ctr.run/github.com/bsideup/liiklus:12037c2c6c326e3c1f15af370c4a6d212d58084b
   provisionerImage: gcr.io/projectriff/pulsar-provisioner/provisioner@sha256:028ec53ad146efe05f7f6122b89d97ee189f396780b744a1e348ee0fcee35ff2
 kind: ConfigMap
 metadata:
