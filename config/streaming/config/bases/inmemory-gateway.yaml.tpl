@@ -3,5 +3,5 @@ kind: ConfigMap
 metadata:
   name: inmemory-gateway
 data:
-  gatewayImage: ctr.run/github.com/bsideup/liiklus:12037c2c6c326e3c1f15af370c4a6d212d58084b
+  gatewayImage: bsideup/liiklus:latest
   provisionerImage: {{ gcloud container images describe gcr.io/projectriff/nop-provisioner/provisioner:0.6.0-snapshot --format="value(image_summary.fully_qualified_digest)" }}
